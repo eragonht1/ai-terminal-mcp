@@ -1,0 +1,30 @@
+{
+  "name": "mcp-terminal-server",
+  "version": "1.1.0",
+  "description": "基于Node.js的MCP服务器，支持Windows终端（CMD和PowerShell）执行命令并管理会话",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --inspect server.js"
+  },
+  "keywords": [
+    "mcp",
+    "terminal",
+    "powershell",
+    "cmd",
+    "node-pty",
+    "windows"
+  ],
+  "author": "瑶瑶",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "os": [
+    "win32"
+  ],
+  "dependencies": {
+    "@lydell/node-pty": "^1.1.0"
+  }
+}
