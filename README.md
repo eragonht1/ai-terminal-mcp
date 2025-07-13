@@ -17,7 +17,7 @@
 ### 🌐 GUI访问
 当AI调用MCP工具时，GUI界面会自动在浏览器中打开：
 ```
-http://localhost:3000
+http://localhost:8347
 ```
 
 ## 核心功能特性
@@ -69,10 +69,10 @@ npm start
 ```json
 {
   "mcpServers": {
-    "terminal-server": {
+    "ai-terminal-mcp": {
       "command": "node",
-      "args": ["G:\\docker\\McpApi\\terminal\\server.js"],
-      "cwd": "G:\\docker\\McpApi\\terminal",
+      "args": ["G:\\docker\\McpApi\\ai-terminal-mcp\\server.js"],
+      "cwd": "G:\\docker\\McpApi\\ai-terminal-mcp",
       "env": {}
     }
   }
@@ -86,8 +86,8 @@ npm start
 对于支持MCP协议的其他AI助手，请参考以下通用配置：
 
 - **命令**: `node`
-- **参数**: `["G:\\docker\\McpApi\\terminal\\server.js"]`
-- **工作目录**: `G:\\docker\\McpApi\\terminal`
+- **参数**: `["G:\\docker\\McpApi\\ai-terminal-mcp\\server.js"]`
+- **工作目录**: `G:\\docker\\McpApi\\ai-terminal-mcp`
 - **协议**: MCP (Model Context Protocol)
 - **通信方式**: STDIO
 
@@ -259,8 +259,8 @@ xterm.js Terminal Renderer
 
 ### 自动启动
 当AI助手调用任何MCP工具时，GUI界面会自动：
-1. 启动WebSocket服务器（端口8080）
-2. 启动Web服务器（端口3000）
+1. 启动WebSocket服务器（端口8573）
+2. 启动Web服务器（端口8347）
 3. 自动打开浏览器显示GUI界面
 
 ### 界面功能

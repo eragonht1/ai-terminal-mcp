@@ -12,7 +12,7 @@ let isRunning = false;
 /**
  * 启动GUI Web服务器
  */
-export async function startGUIServer(port = 3000) {
+export async function startGUIServer(port = 8347) {
     if (isRunning) {
         console.log('GUI Web服务器已在运行');
         return;
@@ -34,7 +34,7 @@ export async function startGUIServer(port = 3000) {
         res.json({
             status: 'running',
             timestamp: new Date().toISOString(),
-            websocketPort: 8080
+            websocketPort: 8573
         });
     });
     
@@ -87,6 +87,6 @@ export function getServerStatus() {
 
 // 如果直接运行此文件，启动服务器
 if (import.meta.url === `file://${process.argv[1]}`) {
-    const port = process.env.GUI_PORT || 3000;
+    const port = process.env.GUI_PORT || 8347;
     startGUIServer(port).catch(console.error);
 }

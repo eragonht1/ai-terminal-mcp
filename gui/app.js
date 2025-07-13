@@ -133,7 +133,7 @@ class MCPTerminalGUI {
      * 初始化WebSocket连接
      */
     initWebSocket() {
-        const wsUrl = 'ws://localhost:8080';
+        const wsUrl = 'ws://localhost:8573';
         
         try {
             this.ws = new WebSocket(wsUrl);

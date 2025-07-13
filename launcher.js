@@ -14,8 +14,8 @@ export class Launcher {
     constructor() {
         this.guiProcess = null;
         this.isGUIRunning = false;
-        this.guiPort = 3000;
-        this.wsPort = 8080;
+        this.guiPort = 8347;
+        this.wsPort = 8573;
         this.startupDelay = 1000; // 启动延迟
         this.maxRetries = 3;
         this.retryCount = 0;

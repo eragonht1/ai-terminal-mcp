@@ -5,7 +5,7 @@ import { WebSocketBridge } from './websocket-bridge.js';
 class MCPTerminalServer {
     constructor() {
         this.tm = new TerminalManager();
-        this.wsBridge = new WebSocketBridge(8080);
+        this.wsBridge = new WebSocketBridge(8573);
         this.guiStarted = false;
 
         // 监听终端管理器事件并广播到GUI
