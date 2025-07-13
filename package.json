@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "gui": "node gui-server.js",
     "dev": "node --inspect server.js"
   },
   "keywords": [

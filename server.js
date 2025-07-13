@@ -288,14 +288,71 @@ class MCPTerminalServer {
             // 启动WebSocket服务器
             this.wsBridge.start();
 
-            // 启动GUI Web服务器
-            const { startGUIServer } = await import('./gui-server.js');
-            await startGUIServer();
+            // 检查GUI Web服务器是否已运行
+            const isGUIRunning = await this.checkGUIServerRunning();
+
+            // 确保GUI服务器运行
+            if (!isGUIRunning) {
+                const { startGUIServer } = await import('./gui-server.js');
+                await startGUIServer();
+                console.log('GUI服务器已启动');
+            }
+
+            // 简单可靠方案：每次都打开浏览器，让浏览器处理重复打开
+            await this.openBrowser();
+            console.log('浏览器已打开GUI界面');
 
             this.guiStarted = true;
             console.log('GUI界面已启动');
         } catch (error) {
             console.error('启动GUI界面失败:', error);
+        }
+    }
+
+    /**
+     * 检查GUI服务器是否正在运行
+     */
+    async checkGUIServerRunning() {
+        try {
+            const response = await fetch('http://localhost:8347/health');
+            return response.ok;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * 检查是否有真正活跃的WebSocket连接
+     * 使用经过测试验证的ping/pong机制
+     */
+    async checkRealActiveConnections() {
+        // 首先检查是否有连接
+        if (!this.wsBridge.hasActiveConnections()) {
+            console.log('📊 没有WebSocket连接');
+            return false;
+        }
+
+        // 发送ping测试连接是否真的活跃
+        try {
+            const activeCount = await this.wsBridge.pingAllClients();
+            console.log(`📊 活跃连接检查结果: ${activeCount} 个连接活跃`);
+            return activeCount > 0;
+        } catch (error) {
+            console.error('❌ 检查连接活跃性失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 打开浏览器显示GUI界面
+     */
+    async openBrowser() {
+        try {
+            const open = (await import('open')).default;
+            await open('http://localhost:8347');
+            console.log('浏览器已打开GUI界面');
+        } catch (error) {
+            console.error('打开浏览器失败:', error);
         }
     }
 

@@ -218,6 +218,11 @@ class MCPTerminalGUI {
                 this.handleSessionSync(sessionId, eventData);
                 break;
 
+            case 'ping':
+                // 响应ping消息
+                this.handlePing(data);
+                break;
+
             default:
                 console.log('未知消息类型:', type);
         }
@@ -289,10 +294,14 @@ class MCPTerminalGUI {
      */
     handleSessionSync(sessionId, data) {
         console.log('会话同步:', sessionId, data);
-        
+
         if (window.sessionManager) {
             window.sessionManager.syncSession(sessionId, data);
         }
+
+        // 更新会话计数
+        this.updateSessionCount();
+        this.hideEmptyState();
     }
 
     /**
@@ -341,7 +350,8 @@ class MCPTerminalGUI {
      * 更新会话计数
      */
     updateSessionCount() {
-        const count = this.sessions.size;
+        // 从sessionManager获取实际的会话数量
+        const count = window.sessionManager ? window.sessionManager.sessions.size : 0;
         this.elements.sessionCount.textContent = `会话: ${count}`;
     }
 
@@ -423,6 +433,21 @@ class MCPTerminalGUI {
                     this.clearHistory();
                     break;
             }
+        }
+    }
+
+    /**
+     * 处理ping消息
+     */
+    handlePing(data) {
+        // 响应pong消息
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+                type: 'pong',
+                timestamp: new Date().toISOString(),
+                originalTimestamp: data.timestamp
+            }));
+            console.log('已响应ping消息');
         }
     }
 

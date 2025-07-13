@@ -47,13 +47,8 @@ export async function startGUIServer(port = 8347) {
     server = app.listen(port, 'localhost', () => {
         console.log(`GUI Web服务器已启动: http://localhost:${port}`);
         isRunning = true;
-        
-        // 自动打开浏览器
-        setTimeout(() => {
-            open(`http://localhost:${port}`)
-                .then(() => console.log('浏览器已自动打开GUI界面'))
-                .catch(err => console.error('自动打开浏览器失败:', err));
-        }, 1000);
+
+        // 注意：浏览器打开由MCP服务器统一管理，这里不自动打开
     });
     
     server.on('error', (error) => {
