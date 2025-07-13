@@ -1,3 +1,6 @@
+# DK文件夹 - 包含敏感信息，不应提交到版本控制
+DK文件夹(未经允许不得查看)/
+
 # Node.js dependencies
 node_modules/
 

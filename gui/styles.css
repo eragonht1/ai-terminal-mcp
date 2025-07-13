@@ -1,0 +1,426 @@
+/* 基础样式重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    background: #1e1e1e;
+    color: #cccccc;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* 主容器 */
+.terminal-manager {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #1e1e1e;
+}
+
+/* 顶部状态栏 */
+.status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #007acc;
+    color: white;
+    padding: 4px 12px;
+    font-size: 12px;
+    min-height: 24px;
+}
+
+.status-left, .status-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.indicator-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff6b6b;
+    animation: pulse 2s infinite;
+}
+
+.indicator-dot.connected {
+    background: #51cf66;
+    animation: none;
+}
+
+.status-info {
+    font-weight: 500;
+}
+
+/* 标签栏 */
+.tab-bar {
+    display: flex;
+    background: #2d2d30;
+    border-bottom: 1px solid #3e3e42;
+    min-height: 35px;
+    align-items: center;
+    overflow-x: auto;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    background: #2d2d30;
+    border-right: 1px solid #3e3e42;
+    cursor: pointer;
+    color: #cccccc;
+    font-size: 13px;
+    min-width: 120px;
+    max-width: 200px;
+    position: relative;
+    transition: background-color 0.2s;
+    white-space: nowrap;
+}
+
+.tab:hover {
+    background: #37373d;
+}
+
+.tab.active {
+    background: #1e1e1e;
+    color: #ffffff;
+}
+
+.tab.loading {
+    color: #ffa500;
+}
+
+.tab-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tab-close {
+    margin-left: 8px;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    opacity: 0.7;
+    transition: all 0.2s;
+}
+
+.tab-close:hover {
+    background: #e81123;
+    opacity: 1;
+    color: white;
+}
+
+.new-tab-btn {
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    color: #cccccc;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s;
+}
+
+.new-tab-btn:hover {
+    background: #37373d;
+}
+
+/* 终端内容区域 */
+.terminal-content {
+    flex: 1;
+    position: relative;
+    background: #1e1e1e;
+    overflow: hidden;
+}
+
+.terminal-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    flex-direction: column;
+}
+
+.terminal-panel.active {
+    display: flex;
+}
+
+/* 会话信息栏 */
+.session-info {
+    padding: 8px 12px;
+    background: #252526;
+    border-bottom: 1px solid #3e3e42;
+    font-size: 12px;
+    color: #6a6a6a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.session-id {
+    color: #4ec9b0;
+    font-weight: bold;
+}
+
+.session-type {
+    color: #569cd6;
+}
+
+.session-cwd {
+    color: #ce9178;
+}
+
+/* xterm.js 终端区域 */
+.terminal-output {
+    flex: 1;
+    padding: 0;
+    background: #1e1e1e;
+    position: relative;
+}
+
+.xterm {
+    height: 100% !important;
+    width: 100% !important;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+.xterm .xterm-viewport {
+    background-color: #1e1e1e !important;
+}
+
+.xterm .xterm-screen {
+    background-color: #1e1e1e !important;
+}
+
+.xterm .xterm-cursor {
+    background-color: #d4d4d4 !important;
+}
+
+.xterm .xterm-selection {
+    background-color: #264f78 !important;
+}
+
+/* 空白状态 */
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 40px;
+}
+
+.empty-message h3 {
+    color: #ffffff;
+    margin-bottom: 12px;
+    font-size: 24px;
+}
+
+.empty-message p {
+    color: #cccccc;
+    margin-bottom: 24px;
+    font-size: 14px;
+}
+
+.empty-features {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #cccccc;
+    font-size: 14px;
+}
+
+.feature-icon {
+    font-size: 16px;
+}
+
+.empty-hint {
+    color: #6a6a6a;
+    font-style: italic;
+    font-size: 12px;
+}
+
+/* 底部信息栏 */
+.info-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #252526;
+    border-top: 1px solid #3e3e42;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: #cccccc;
+    min-height: 22px;
+}
+
+.info-left, .info-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.info-item {
+    color: #cccccc;
+}
+
+.info-btn {
+    background: transparent;
+    border: none;
+    color: #cccccc;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 2px;
+    transition: background-color 0.2s;
+}
+
+.info-btn:hover {
+    background: #37373d;
+}
+
+/* 设置面板 */
+.settings-panel {
+    position: fixed;
+    top: 0;
+    right: -300px;
+    width: 300px;
+    height: 100vh;
+    background: #252526;
+    border-left: 1px solid #3e3e42;
+    transition: right 0.3s ease;
+    z-index: 1000;
+}
+
+.settings-panel.open {
+    right: 0;
+}
+
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #3e3e42;
+    background: #2d2d30;
+}
+
+.settings-header h3 {
+    color: #ffffff;
+    font-size: 14px;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    color: #cccccc;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px;
+}
+
+.close-btn:hover {
+    color: #ffffff;
+}
+
+.settings-content {
+    padding: 16px;
+}
+
+.setting-group {
+    margin-bottom: 16px;
+}
+
+.setting-group label {
+    display: block;
+    color: #cccccc;
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.setting-group select,
+.setting-group input[type="range"] {
+    width: 100%;
+    background: #3c3c3c;
+    border: 1px solid #3e3e42;
+    color: #cccccc;
+    padding: 6px 8px;
+    border-radius: 3px;
+}
+
+.setting-group input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+/* 动画效果 */
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+.loading .tab-title::after {
+    content: "...";
+    animation: pulse 1.5s infinite;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #2d2d30;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #424242;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #4f4f4f;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .tab {
+        min-width: 80px;
+        max-width: 120px;
+        padding: 6px 12px;
+    }
+    
+    .terminal-output {
+        font-size: 12px;
+        padding: 8px;
+    }
+    
+    .settings-panel {
+        width: 250px;
+    }
+}

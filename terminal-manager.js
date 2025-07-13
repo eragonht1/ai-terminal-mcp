@@ -1,9 +1,11 @@
 import * as pty from '@lydell/node-pty';
 import { randomUUID } from 'crypto';
 import path from 'path';
+import { EventEmitter } from 'events';
 
-export class TerminalManager {
+export class TerminalManager extends EventEmitter {
     constructor() {
+        super();
         this.sessions = new Map();
         this.maxLines = 1000;
         this.timeout = 3600000; // 1小时
@@ -44,11 +46,18 @@ export class TerminalManager {
             if (s) {
                 s.status = 'closed';
                 s.exitCode = code;
+                // 发射会话关闭事件
+                this.emit('sessionClosed', sessionId, code);
             }
         });
 
         this.sessions.set(sessionId, session);
-        return { sessionId, type, cwd, status: 'active', pid: ptyProcess.pid };
+
+        // 发射会话创建事件
+        const sessionData = { sessionId, type, cwd, status: 'active', pid: ptyProcess.pid };
+        this.emit('sessionCreated', sessionData);
+
+        return sessionData;
     }
 
     writeToSession(sessionId, input, addNewline = true) {
@@ -109,11 +118,15 @@ export class TerminalManager {
         const session = this.sessions.get(sessionId);
         if (!session) return;
 
-        session.output.push(...data.split(/\r?\n/));
+        const newLines = data.split(/\r?\n/);
+        session.output.push(...newLines);
         if (session.output.length > this.maxLines) {
             session.output.splice(0, session.output.length - this.maxLines);
         }
         session.lastActivity = new Date();
+
+        // 发射输出接收事件
+        this.emit('outputReceived', sessionId, newLines);
     }
 
     async executeCommand(sessionId, command, timeout = 5000) {

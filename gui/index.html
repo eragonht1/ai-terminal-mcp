@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' ws://localhost:8080; img-src 'self' data:;">
+    <title>MCP Terminal GUI - AI操作可视化界面</title>
+    <link rel="stylesheet" href="/node_modules/@xterm/xterm/css/xterm.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="terminal-manager">
+        <!-- 顶部状态栏 -->
+        <div class="status-bar">
+            <div class="status-left">
+                <span class="status-indicator" id="connection-status">
+                    <span class="indicator-dot"></span>
+                    <span class="indicator-text">连接中...</span>
+                </span>
+                <span class="status-info" id="session-count">会话: 0</span>
+            </div>
+            <div class="status-right">
+                <span class="status-info" id="current-time"></span>
+            </div>
+        </div>
+
+        <!-- 标签栏 -->
+        <div class="tab-bar" id="tab-bar">
+            <button class="new-tab-btn" id="new-tab-btn" title="新建终端">+</button>
+        </div>
+
+        <!-- 终端内容区域 -->
+        <div class="terminal-content" id="terminal-content">
+            <!-- 空白状态提示 -->
+            <div class="empty-state" id="empty-state">
+                <div class="empty-message">
+                    <h3>🚀 MCP Terminal GUI</h3>
+                    <p>AI操作终端的实时可视化界面</p>
+                    <div class="empty-features">
+                        <div class="feature-item">
+                            <span class="feature-icon">👁️</span>
+                            <span>透明化AI操作过程</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">⚡</span>
+                            <span>实时流式数据展示</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">📊</span>
+                            <span>多会话并发管理</span>
+                        </div>
+                    </div>
+                    <p class="empty-hint">等待AI调用MCP工具时，终端会话将自动显示在这里</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部信息栏 -->
+        <div class="info-bar">
+            <div class="info-left">
+                <span class="info-item" id="websocket-status">WebSocket: 未连接</span>
+                <span class="info-item" id="last-activity">最后活动: --</span>
+            </div>
+            <div class="info-right">
+                <span class="info-item" id="total-events">事件: 0</span>
+                <button class="info-btn" id="clear-history" title="清除历史">🗑️</button>
+                <button class="info-btn" id="settings-btn" title="设置">⚙️</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置面板 -->
+    <div class="settings-panel" id="settings-panel">
+        <div class="settings-header">
+            <h3>设置</h3>
+            <button class="close-btn" id="close-settings">×</button>
+        </div>
+        <div class="settings-content">
+            <div class="setting-group">
+                <label>终端主题</label>
+                <select id="terminal-theme">
+                    <option value="dark">深色主题</option>
+                    <option value="light">浅色主题</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label>字体大小</label>
+                <input type="range" id="font-size" min="10" max="20" value="14">
+                <span id="font-size-value">14px</span>
+            </div>
+            <div class="setting-group">
+                <label>自动滚动</label>
+                <input type="checkbox" id="auto-scroll" checked>
+            </div>
+            <div class="setting-group">
+                <label>显示时间戳</label>
+                <input type="checkbox" id="show-timestamps" checked>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载xterm.js和插件 -->
+    <script src="/node_modules/@xterm/xterm/lib/xterm.js"></script>
+    <script src="/node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+    <script src="/node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+    
+    <!-- 应用脚本 -->
+    <script src="app.js"></script>
+    <script src="terminal-renderer.js"></script>
+    <script src="session-manager.js"></script>
+</body>
+</html>

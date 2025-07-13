@@ -1,9 +1,15 @@
 #!/usr/bin/env node
 import { TerminalManager } from './terminal-manager.js';
+import { WebSocketBridge } from './websocket-bridge.js';
 
 class MCPTerminalServer {
     constructor() {
         this.tm = new TerminalManager();
+        this.wsBridge = new WebSocketBridge(8080);
+        this.guiStarted = false;
+
+        // 监听终端管理器事件并广播到GUI
+        this.setupEventListeners();
     }
 
     start() {
@@ -14,7 +20,10 @@ class MCPTerminalServer {
             });
         });
         ['SIGINT', 'SIGTERM', 'exit'].forEach(sig =>
-            process.on(sig, () => { this.tm.cleanup(); process.exit(0); })
+            process.on(sig, () => {
+                this.cleanup();
+                process.exit(0);
+            })
         );
     }
 
@@ -147,46 +156,92 @@ class MCPTerminalServer {
 
     async callTool({ name, arguments: args }) {
         const timestamp = new Date().toISOString();
+
+        // 启动GUI界面（如果尚未启动）
+        await this.startGUI();
+
         try {
+            // 广播工具调用开始
+            this.wsBridge.broadcastToolCall(name, args, null, 'executing');
+
             switch (name) {
                 case 'tm_execute':
                     const { command, terminal_type = 'powershell', cwd, timeout = 5000 } = args;
                     if (!command || !cwd) throw new Error('缺少必需参数');
 
-                    const sessionId = this.tm.createSession(terminal_type, cwd).sessionId;
+                    const sessionResult = this.tm.createSession(terminal_type, cwd);
+                    const sessionId = sessionResult.sessionId;
+
+                    // 广播工具调用状态更新
+                    this.wsBridge.broadcastToolCall(name, args, sessionId, 'session_created');
+
                     const output = await this.tm.executeCommand(sessionId, command, timeout);
+
+                    // 广播工具调用完成
+                    this.wsBridge.broadcastToolCall(name, args, sessionId, 'completed');
+
                     return { success: true, sessionId, command, output: output.filter(l => l.trim()), timestamp };
 
                 case 'tm_read':
                     const { session_id: readSid } = args;
                     if (!readSid) throw new Error('缺少session_id');
 
+                    // 广播工具调用状态
+                    this.wsBridge.broadcastToolCall(name, args, readSid, 'executing');
+
                     const readOutput = this.tm.readSessionOutput(readSid);
                     const sessionInfo = this.tm.getSessionInfo(readSid);
+
+                    // 广播工具调用完成
+                    this.wsBridge.broadcastToolCall(name, args, readSid, 'completed');
+
                     return { success: true, sessionId: readSid, output: readOutput.filter(l => l.trim()), sessionInfo, timestamp };
 
                 case 'tm_write':
                     const { session_id: writeSid, input, add_newline = true } = args;
                     if (!writeSid || input === undefined) throw new Error('缺少必需参数');
 
+                    // 广播工具调用状态
+                    this.wsBridge.broadcastToolCall(name, args, writeSid, 'executing');
+
                     this.tm.writeToSession(writeSid, input, add_newline);
+
+                    // 广播工具调用完成
+                    this.wsBridge.broadcastToolCall(name, args, writeSid, 'completed');
+
                     return { success: true, sessionId: writeSid, input, timestamp };
 
                 case 'tm_list':
+                    // 广播工具调用状态
+                    this.wsBridge.broadcastToolCall(name, args, null, 'executing');
+
                     const sessions = this.tm.getAllSessions();
+
+                    // 广播工具调用完成
+                    this.wsBridge.broadcastToolCall(name, args, null, 'completed');
+
                     return { success: true, sessions, totalSessions: sessions.length, timestamp };
 
                 case 'tm_close':
                     const { session_id: closeSid } = args;
                     if (!closeSid) throw new Error('缺少session_id');
 
+                    // 广播工具调用状态
+                    this.wsBridge.broadcastToolCall(name, args, closeSid, 'executing');
+
                     this.tm.closeSession(closeSid);
+
+                    // 广播工具调用完成
+                    this.wsBridge.broadcastToolCall(name, args, closeSid, 'completed');
+
                     return { success: true, sessionId: closeSid, timestamp };
 
                 default:
                     throw new Error(`未知工具: ${name}`);
             }
         } catch (e) {
+            // 广播错误事件
+            this.wsBridge.broadcastError(null, e, { tool: name, args });
             return { success: false, error: e.message, timestamp };
         }
     }
@@ -197,6 +252,60 @@ class MCPTerminalServer {
 
     sendError(id, code, message) {
         console.log(JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } }));
+    }
+
+    /**
+     * 设置事件监听器，将终端事件广播到GUI
+     */
+    setupEventListeners() {
+        // 监听终端管理器的事件（需要在terminal-manager.js中添加事件发射）
+        this.tm.on('sessionCreated', (sessionData) => {
+            this.wsBridge.broadcastSessionCreated(sessionData);
+        });
+
+        this.tm.on('outputReceived', (sessionId, output) => {
+            this.wsBridge.broadcastTerminalOutput(sessionId, output);
+        });
+
+        this.tm.on('sessionClosed', (sessionId, exitCode) => {
+            this.wsBridge.broadcastSessionClosed(sessionId, exitCode);
+        });
+
+        this.tm.on('errorOccurred', (sessionId, error, context) => {
+            this.wsBridge.broadcastError(sessionId, error, context);
+        });
+    }
+
+    /**
+     * 启动GUI界面（如果尚未启动）
+     */
+    async startGUI() {
+        if (this.guiStarted) {
+            return;
+        }
+
+        try {
+            // 启动WebSocket服务器
+            this.wsBridge.start();
+
+            // 启动GUI Web服务器
+            const { startGUIServer } = await import('./gui-server.js');
+            await startGUIServer();
+
+            this.guiStarted = true;
+            console.log('GUI界面已启动');
+        } catch (error) {
+            console.error('启动GUI界面失败:', error);
+        }
+    }
+
+    /**
+     * 清理资源
+     */
+    cleanup() {
+        console.log('正在清理资源...');
+        this.tm.cleanup();
+        this.wsBridge.cleanup();
     }
 }
 
