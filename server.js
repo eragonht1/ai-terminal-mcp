@@ -277,33 +277,42 @@ class MCPTerminalServer {
     }
 
     /**
-     * 启动GUI界面（如果尚未启动）
+     * 启动GUI界面（如果尚未启动）或重新打开浏览器
      */
     async startGUI() {
-        if (this.guiStarted) {
-            return;
-        }
-
         try {
-            // 启动WebSocket服务器
-            this.wsBridge.start();
+            // 如果GUI服务器尚未启动，执行完整启动流程
+            if (!this.guiStarted) {
+                // 启动WebSocket服务器
+                this.wsBridge.start();
 
-            // 检查GUI Web服务器是否已运行
-            const isGUIRunning = await this.checkGUIServerRunning();
+                // 检查GUI Web服务器是否已运行
+                const isGUIRunning = await this.checkGUIServerRunning();
 
-            // 确保GUI服务器运行
-            if (!isGUIRunning) {
-                const { startGUIServer } = await import('./gui-server.js');
-                await startGUIServer();
-                console.log('GUI服务器已启动');
+                // 确保GUI服务器运行
+                if (!isGUIRunning) {
+                    const { startGUIServer } = await import('./gui-server.js');
+                    await startGUIServer();
+                    console.log('GUI服务器已启动');
+                }
+
+                this.guiStarted = true;
+                console.log('GUI服务器初始化完成');
             }
 
-            // 简单可靠方案：每次都打开浏览器，让浏览器处理重复打开
-            await this.openBrowser();
-            console.log('浏览器已打开GUI界面');
+            // 检查WebSocket连接状态
+            const hasConnections = this.wsBridge.hasActiveConnections();
+            console.log(`WebSocket连接状态: ${hasConnections ? '有连接' : '无连接'}`);
 
-            this.guiStarted = true;
-            console.log('GUI界面已启动');
+            // 如果没有活跃连接，重新打开浏览器
+            if (!hasConnections) {
+                console.log('检测到浏览器已关闭，重新打开浏览器...');
+                await this.openBrowser();
+                console.log('浏览器已重新打开');
+            } else {
+                console.log('浏览器连接正常，无需重新打开');
+            }
+
         } catch (error) {
             console.error('启动GUI界面失败:', error);
         }
@@ -321,27 +330,7 @@ class MCPTerminalServer {
         }
     }
 
-    /**
-     * 检查是否有真正活跃的WebSocket连接
-     * 使用经过测试验证的ping/pong机制
-     */
-    async checkRealActiveConnections() {
-        // 首先检查是否有连接
-        if (!this.wsBridge.hasActiveConnections()) {
-            console.log('📊 没有WebSocket连接');
-            return false;
-        }
 
-        // 发送ping测试连接是否真的活跃
-        try {
-            const activeCount = await this.wsBridge.pingAllClients();
-            console.log(`📊 活跃连接检查结果: ${activeCount} 个连接活跃`);
-            return activeCount > 0;
-        } catch (error) {
-            console.error('❌ 检查连接活跃性失败:', error);
-            return false;
-        }
-    }
 
     /**
      * 打开浏览器显示GUI界面

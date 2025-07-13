@@ -131,12 +131,7 @@ export class WebSocketBridge extends EventEmitter {
         const { type, data } = message;
 
         switch (type) {
-            case 'ping':
-                this.sendToClient(ws, {
-                    type: 'pong',
-                    timestamp: new Date().toISOString()
-                });
-                break;
+
 
             case 'request_session_data':
                 const sessionId = data?.sessionId;
@@ -364,90 +359,7 @@ export class WebSocketBridge extends EventEmitter {
         return this.clients.size;
     }
 
-    /**
-     * 向所有客户端发送ping，检查真正活跃的连接数
-     * 这个方法已经通过独立测试程序验证成功
-     */
-    async pingAllClients() {
-        console.log(`🏓 开始ping测试 (客户端数: ${this.clients.size})`);
 
-        if (this.clients.size === 0) {
-            console.log('⚠️ 没有客户端连接');
-            return 0;
-        }
-
-        const pingPromises = [];
-        const deadClients = new Set();
-
-        this.clients.forEach(ws => {
-            if (ws.readyState === ws.OPEN) {
-                const pingPromise = new Promise((resolve) => {
-                    const pingTimestamp = new Date().toISOString();
-                    let pongReceived = false;
-
-                    const timeout = setTimeout(() => {
-                        if (!pongReceived) {
-                            console.log(`⏰ Ping超时: ${pingTimestamp}`);
-                            deadClients.add(ws);
-                            resolve(false);
-                        }
-                    }, 2000);
-
-                    // 临时存储pong处理器
-                    const pongHandler = (data) => {
-                        try {
-                            const message = JSON.parse(data.toString());
-                            if (message.type === 'pong' && message.originalTimestamp === pingTimestamp) {
-                                pongReceived = true;
-                                clearTimeout(timeout);
-                                ws.removeListener('message', pongHandler);
-                                console.log(`✅ 收到pong响应: ${pingTimestamp}`);
-                                resolve(true);
-                            }
-                        } catch (e) {
-                            // 忽略解析错误
-                        }
-                    };
-
-                    try {
-                        const pingMessage = {
-                            type: 'ping',
-                            timestamp: pingTimestamp
-                        };
-
-                        ws.send(JSON.stringify(pingMessage));
-                        console.log(`📤 发送ping: ${pingTimestamp}`);
-
-                        // 监听pong响应
-                        ws.on('message', pongHandler);
-
-                    } catch (error) {
-                        console.error(`❌ 发送ping失败: ${error}`);
-                        clearTimeout(timeout);
-                        deadClients.add(ws);
-                        resolve(false);
-                    }
-                });
-
-                pingPromises.push(pingPromise);
-            } else {
-                console.log(`❌ 连接状态不是OPEN: ${ws.readyState}`);
-                deadClients.add(ws);
-            }
-        });
-
-        const results = await Promise.all(pingPromises);
-        const activeCount = results.filter(result => result === true).length;
-
-        console.log(`📊 Ping测试结果: ${activeCount}/${this.clients.size} 个连接活跃`);
-
-        // 清理断开的连接
-        deadClients.forEach(ws => {
-            this.clients.delete(ws);
-        });
-
-        return activeCount;
-    }
 
     /**
      * 清理资源
