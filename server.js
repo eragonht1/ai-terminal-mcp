@@ -6,7 +6,6 @@ class MCPTerminalServer {
     constructor() {
         this.tm = new TerminalManager();
         this.wsBridge = new WebSocketBridge(8573);
-        this.guiStarted = false;
 
         // 监听终端管理器事件并广播到GUI
         this.setupEventListeners();
@@ -277,27 +276,27 @@ class MCPTerminalServer {
     }
 
     /**
-     * 启动GUI界面（如果尚未启动）或重新打开浏览器
+     * 启动GUI界面（按需启动）或重新打开浏览器
      */
     async startGUI() {
         try {
-            // 如果GUI服务器尚未启动，执行完整启动流程
-            if (!this.guiStarted) {
-                // 启动WebSocket服务器
+            // 检查WebSocket服务器状态，按需启动
+            if (!this.wsBridge.isRunning) {
+                console.log('启动WebSocket服务器...');
                 this.wsBridge.start();
+            } else {
+                console.log('WebSocket服务器已在运行');
+            }
 
-                // 检查GUI Web服务器是否已运行
-                const isGUIRunning = await this.checkGUIServerRunning();
-
-                // 确保GUI服务器运行
-                if (!isGUIRunning) {
-                    const { startGUIServer } = await import('./gui-server.js');
-                    await startGUIServer();
-                    console.log('GUI服务器已启动');
-                }
-
-                this.guiStarted = true;
-                console.log('GUI服务器初始化完成');
+            // 检查GUI Web服务器状态，按需启动
+            const isGUIRunning = await this.checkGUIServerRunning();
+            if (!isGUIRunning) {
+                console.log('启动GUI Web服务器...');
+                const { startGUIServer } = await import('./gui-server.js');
+                await startGUIServer();
+                console.log('GUI Web服务器已启动');
+            } else {
+                console.log('GUI Web服务器已在运行');
             }
 
             // 检查WebSocket连接状态
