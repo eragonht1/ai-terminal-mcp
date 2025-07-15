@@ -19,7 +19,7 @@ export class TerminalManager extends EventEmitter {
         if (!cwd || !path.isAbsolute(cwd)) throw new Error('需要绝对路径');
 
         const sessionId = id || randomUUID();
-        const shell = type === 'powershell' ? 'powershell.exe' : 'cmd.exe';
+        const shell = type === 'powershell' ? 'C:\\Program Files\\PowerShell\\7\\pwsh.exe' : 'cmd.exe';
 
         const ptyProcess = pty.spawn(shell, [], {
             name: 'xterm-color',
