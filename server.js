@@ -141,16 +141,11 @@ class MCPTerminalServer {
             },
             {
                 name: 'tm_close',
-                description: '关闭指定的终端会话',
+                description: '一键关闭所有活跃的终端会话',
                 inputSchema: {
                     type: 'object',
-                    properties: {
-                        session_id: {
-                            type: 'string',
-                            description: '要关闭的会话ID'
-                        }
-                    },
-                    required: ['session_id']
+                    properties: {},
+                    required: []
                 }
             }
         ];
@@ -225,18 +220,23 @@ class MCPTerminalServer {
                     return { success: true, sessions, totalSessions: sessions.length, timestamp };
 
                 case 'tm_close':
-                    const { session_id: closeSid } = args;
-                    if (!closeSid) throw new Error('缺少session_id');
-
                     // 广播工具调用状态
-                    this.wsBridge.broadcastToolCall(name, args, closeSid, 'executing');
+                    this.wsBridge.broadcastToolCall(name, args, null, 'executing');
 
-                    this.tm.closeSession(closeSid);
+                    const closeResult = this.tm.closeAllSessions();
 
                     // 广播工具调用完成
-                    this.wsBridge.broadcastToolCall(name, args, closeSid, 'completed');
+                    this.wsBridge.broadcastToolCall(name, args, null, 'completed');
 
-                    return { success: true, sessionId: closeSid, timestamp };
+                    return {
+                        success: closeResult.success,
+                        message: closeResult.message,
+                        closedSessions: closeResult.closedSessions,
+                        failedSessions: closeResult.failedSessions,
+                        totalClosed: closeResult.totalClosed,
+                        totalFailed: closeResult.totalFailed,
+                        timestamp
+                    };
 
                 default:
                     throw new Error(`未知工具: ${name}`);

@@ -10,7 +10,7 @@ export class TerminalManager extends EventEmitter {
         this.maxLines = 1000;
         this.timeout = 3600000; // 1小时
         this.psRegex = /PS\s+[A-Z]:\\[^>]*>\s*$/i;
-        this.cmdRegex = /[A-Z]:\\[^>]*>\s*$/i;
+        this.cmdRegex = /[A-Za-z]:\\[^>]*>\s*$/i;
 
         setInterval(() => this.cleanup(), 600000); // 10分钟清理
     }
@@ -76,13 +76,62 @@ export class TerminalManager extends EventEmitter {
         return [...session.output];
     }
 
-    closeSession(sessionId) {
-        const session = this.sessions.get(sessionId);
-        if (!session) throw new Error(`会话不存在: ${sessionId}`);
+    /**
+     * 关闭所有活跃的终端会话（一键关闭功能）
+     * @returns {Object} 包含关闭结果的对象
+     */
+    closeAllSessions() {
+        const activeSessions = Array.from(this.sessions.values()).filter(session => session.status === 'active');
 
-        session.ptyProcess.kill();
-        session.status = 'closed';
-        setTimeout(() => this.sessions.delete(sessionId), 5000);
+        if (activeSessions.length === 0) {
+            return {
+                success: true,
+                message: '没有活跃的会话需要关闭',
+                closedSessions: [],
+                totalClosed: 0
+            };
+        }
+
+        const closedSessions = [];
+        const failedSessions = [];
+
+        // 遍历所有活跃会话并关闭
+        for (const session of activeSessions) {
+            try {
+                session.ptyProcess.kill();
+                session.status = 'closed';
+
+                // 发射会话关闭事件
+                this.emit('sessionClosed', session.id, 0);
+
+                closedSessions.push({
+                    sessionId: session.id,
+                    type: session.type,
+                    cwd: session.cwd
+                });
+
+                // 延迟删除会话
+                setTimeout(() => this.sessions.delete(session.id), 5000);
+
+            } catch (error) {
+                failedSessions.push({
+                    sessionId: session.id,
+                    error: error.message
+                });
+
+                // 发射错误事件
+                this.emit('errorOccurred', session.id, error, { action: 'closeAllSessions' });
+            }
+        }
+
+        return {
+            success: failedSessions.length === 0,
+            message: `成功关闭 ${closedSessions.length} 个会话${failedSessions.length > 0 ? `，${failedSessions.length} 个失败` : ''}`,
+            closedSessions,
+            failedSessions,
+            totalClosed: closedSessions.length,
+            totalFailed: failedSessions.length
+        };
     }
 
     getSessionInfo(sessionId) {
