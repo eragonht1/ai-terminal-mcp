@@ -9,6 +9,9 @@ class MCPTerminalServer {
 
         // 监听终端管理器事件并广播到GUI
         this.setupEventListeners();
+
+        // 初始化GUI服务器
+        this.initializeGUI();
     }
 
     start() {
@@ -19,8 +22,8 @@ class MCPTerminalServer {
             });
         });
         ['SIGINT', 'SIGTERM', 'exit'].forEach(sig =>
-            process.on(sig, () => {
-                this.cleanup();
+            process.on(sig, async () => {
+                await this.cleanup();
                 process.exit(0);
             })
         );
@@ -156,8 +159,8 @@ class MCPTerminalServer {
     async callTool({ name, arguments: args }) {
         const timestamp = new Date().toISOString();
 
-        // 启动GUI界面（如果尚未启动）
-        await this.startGUI();
+        // 智能浏览器管理
+        await this.manageBrowser();
 
         try {
             // 广播工具调用开始
@@ -276,56 +279,42 @@ class MCPTerminalServer {
     }
 
     /**
-     * 启动GUI界面（按需启动）或重新打开浏览器
+     * 初始化GUI服务器（检测状态，避免重复启动）
      */
-    async startGUI() {
+    async initializeGUI() {
         try {
-            // 检查WebSocket服务器状态，按需启动
+            // 检测WebSocket服务器是否已启动
             if (!this.wsBridge.isRunning) {
+                // 只有WebSocket服务器未启动时，才启动两个服务器
                 console.log('启动WebSocket服务器...');
                 this.wsBridge.start();
-            } else {
-                console.log('WebSocket服务器已在运行');
-            }
 
-            // 检查GUI Web服务器状态，按需启动
-            const isGUIRunning = await this.checkGUIServerRunning();
-            if (!isGUIRunning) {
                 console.log('启动GUI Web服务器...');
                 const { startGUIServer } = await import('./gui-server.js');
                 await startGUIServer();
-                console.log('GUI Web服务器已启动');
+
+                console.log('GUI服务器启动完成');
             } else {
-                console.log('GUI Web服务器已在运行');
+                console.log('GUI服务器已在运行，跳过启动');
             }
-
-            // 检查WebSocket连接状态
-            const hasConnections = this.wsBridge.hasActiveConnections();
-            console.log(`WebSocket连接状态: ${hasConnections ? '有连接' : '无连接'}`);
-
-            // 如果没有活跃连接，重新打开浏览器
-            if (!hasConnections) {
-                console.log('检测到浏览器已关闭，重新打开浏览器...');
-                await this.openBrowser();
-                console.log('浏览器已重新打开');
-            } else {
-                console.log('浏览器连接正常，无需重新打开');
-            }
-
         } catch (error) {
-            console.error('启动GUI界面失败:', error);
+            console.error('初始化GUI服务器失败:', error);
         }
     }
 
     /**
-     * 检查GUI服务器是否正在运行
+     * 智能浏览器管理
      */
-    async checkGUIServerRunning() {
+    async manageBrowser() {
         try {
-            const response = await fetch('http://localhost:8347/health');
-            return response.ok;
+            // 检测WebSocket连接状态
+            const hasConnections = this.wsBridge.hasActiveConnections();
+            if (!hasConnections) {
+                console.log('检测到浏览器已关闭，重新打开浏览器...');
+                await this.openBrowser();
+            }
         } catch (error) {
-            return false;
+            console.error('浏览器管理失败:', error);
         }
     }
 
@@ -347,10 +336,23 @@ class MCPTerminalServer {
     /**
      * 清理资源
      */
-    cleanup() {
+    async cleanup() {
         console.log('正在清理资源...');
+
+        // 清理终端管理器
         this.tm.cleanup();
+
+        // 清理WebSocket服务器
         this.wsBridge.cleanup();
+
+        // 清理GUI Web服务器
+        try {
+            const { stopGUIServer } = await import('./gui-server.js');
+            stopGUIServer();
+            console.log('GUI Web服务器已清理');
+        } catch (error) {
+            console.error('清理GUI Web服务器失败:', error);
+        }
     }
 }
 
