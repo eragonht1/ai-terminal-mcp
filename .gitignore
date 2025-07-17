@@ -59,3 +59,12 @@ Thumbs.db
 *.tmp
 *.temp
 *.log
+
+# Project specific
+README_old.md
+server_old.js
+server_new.js
+
+# Test output
+test-output/
+*.test.log

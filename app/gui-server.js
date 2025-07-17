@@ -108,7 +108,7 @@ function _configureStaticFiles(app) {
     app.use(express.static(join(__dirname, 'gui')));
 
     // Node modules目录（用于前端依赖）
-    app.use('/node_modules', express.static(join(__dirname, 'node_modules')));
+    app.use('/node_modules', express.static(join(__dirname, '..', 'node_modules')));
 }
 
 /**

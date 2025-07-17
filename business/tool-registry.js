@@ -14,7 +14,7 @@
  * @version 1.1.0
  */
 
-import { TERMINAL_CONFIG } from './config.js';
+import { TERMINAL_CONFIG } from '../config/app-config.js';
 
 /**
  * 工具定义注册表

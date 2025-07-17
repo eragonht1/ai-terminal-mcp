@@ -5,11 +5,11 @@
 ## ✨ 特性
 
 - **🖥️ 多终端支持**: 支持PowerShell和CMD终端
-- **� 会话管理**: 同时管理多个终端会话，每个会话独立ID
+- **📋 会话管理**: 同时管理多个终端会话，每个会话独立ID
 - **🎨 可视化GUI**: 实时显示AI操作过程的Web界面
 - **⚡ 高性能**: 优化的架构设计，响应时间<200ms
-- **� 智能管理**: 自动清理资源，防止内存泄漏
-- **� WebSocket通信**: 实时数据传输，支持多客户端连接
+- **🧹 智能管理**: 自动清理资源，防止内存泄漏
+- **🌐 WebSocket通信**: 实时数据传输，支持多客户端连接
 
 ## 🌐 GUI界面
 
@@ -24,7 +24,7 @@ GUI界面提供：
 - AI操作过程透明化
 - 专业的VS Code风格界面
 
-## � 系统要求
+## 💻 系统要求
 
 - **操作系统**: Windows 10/11
 - **Node.js**: >= 18.0.0
@@ -51,42 +51,71 @@ nodemon server.js
 
 ## 📁 项目结构
 
+采用分层架构设计，清晰的职责分离：
+
 ```
 ai-terminal-mcp/
-├── 📄 server.js                 # MCP服务器主入口（重构后）
-├── 📄 config.js                 # 统一配置管理
-├── 📄 tools.js                  # 工具定义和注册表
-├── 📄 events.js                 # 事件类型常量定义
-├── 📄 terminal-manager.js       # 终端会话管理器
-├── 📄 websocket-bridge.js       # WebSocket通信桥（重构后）
-├── 📄 gui-server.js             # GUI Web服务器
+├── 📄 server.js                 # MCP服务器主入口
+├── 📄 test_mcp_client.js        # 测试客户端
 ├── 📄 package.json              # 项目配置和依赖
 ├── 📄 README.md                 # 项目说明文档
-└── 📁 gui/                      # GUI界面文件
-    ├── 📄 index.html             # 主界面HTML
-    ├── 📄 app.js                 # 主应用逻辑（重构后）
-    ├── 📄 session-manager.js     # 会话管理器
-    ├── 📄 terminal-renderer.js   # 终端渲染器
-    └── 📄 styles.css             # 界面样式
+├── 📁 config/                   # 配置层
+│   └── 📄 app-config.js         # 统一配置管理
+├── 📁 utils/                    # 工具层
+│   ├── 📄 event-types.js        # 事件类型定义
+│   ├── 📄 event-manager.js      # 事件管理器
+│   ├── 📄 logger.js             # 日志工具
+│   └── 📄 validators.js         # 验证工具
+├── 📁 core/                     # 核心层
+│   ├── 📄 protocol-handler.js   # MCP协议处理器
+│   ├── 📄 terminal-interface.js # 终端接口定义
+│   └── 📄 event-interface.js    # 事件接口定义
+├── 📁 business/                 # 业务层
+│   ├── 📄 terminal-manager.js   # 终端会话管理器
+│   ├── 📄 tool-registry.js      # 工具定义注册表
+│   ├── 📄 tool-executor.js      # 工具执行器
+│   ├── 📄 websocket-bridge.js   # WebSocket通信桥
+│   └── 📄 data-cache.js         # 数据缓存管理
+└── 📁 app/                      # 应用层
+    ├── 📄 server-orchestrator.js # 服务器协调器
+    ├── 📄 gui-service.js        # GUI服务管理
+    ├── 📄 gui-server.js         # GUI Web服务器
+    └── 📁 gui/                  # GUI界面文件
+        ├── 📄 index.html         # 主界面HTML
+        ├── 📄 app.js             # 主应用逻辑
+        ├── 📄 session-manager.js # 会话管理器
+        ├── 📄 terminal-renderer.js # 终端渲染器
+        └── 📄 styles.css         # 界面样式
 ```
 
-### 📋 核心文件说明
+### 📋 分层架构说明
 
-#### 🔧 服务器端（重构后的架构）
-- **`server.js`** - 主入口，采用依赖注入和职责分离的架构设计
-- **`config.js`** - 统一配置管理，所有常量和配置集中管理
-- **`tools.js`** - 工具定义注册表，管理所有MCP工具
-- **`events.js`** - 事件类型常量，统一事件管理
+#### 🏗️ **配置层 (config/)**
+- **`app-config.js`** - 统一配置管理，所有常量和配置集中管理
+
+#### 🛠️ **工具层 (utils/)**
+- **`event-types.js`** - 事件类型常量定义
+- **`event-manager.js`** - 事件管理器，提供事件验证和创建
+- **`logger.js`** - 统一日志工具，支持不同级别输出
+- **`validators.js`** - 参数验证工具，确保数据有效性
+
+#### ⚡ **核心层 (core/)**
+- **`protocol-handler.js`** - MCP协议处理器，处理协议请求和响应
+- **`terminal-interface.js`** - 终端管理接口定义
+- **`event-interface.js`** - 事件管理接口定义
+
+#### 💼 **业务层 (business/)**
 - **`terminal-manager.js`** - 终端会话管理，支持多会话并发
-- **`websocket-bridge.js`** - WebSocket通信桥，分离数据缓存、事件广播等职责
-- **`gui-server.js`** - GUI Web服务器，提供静态文件服务
+- **`tool-registry.js`** - 工具定义注册表，管理所有MCP工具
+- **`tool-executor.js`** - 工具执行器，处理工具调用逻辑
+- **`websocket-bridge.js`** - WebSocket通信桥，处理实时通信
+- **`data-cache.js`** - 数据缓存管理，优化性能
 
-#### 🎨 客户端（重构后的架构）
-- **`gui/app.js`** - 主应用逻辑，分离WebSocket客户端、UI状态管理、设置管理
-- **`gui/session-manager.js`** - 会话管理器，处理多会话标签
-- **`gui/terminal-renderer.js`** - 终端渲染器，基于xterm.js
-- **`gui/index.html`** - 主界面HTML结构
-- **`gui/styles.css`** - VS Code风格的界面样式
+#### 🎯 **应用层 (app/)**
+- **`server-orchestrator.js`** - 服务器协调器，统一管理各组件
+- **`gui-service.js`** - GUI服务管理，封装GUI服务器功能
+- **`gui-server.js`** - GUI Web服务器，提供静态文件服务
+- **`gui/`** - GUI界面文件，提供可视化操作界面
 
 ## ⚙️ 配置AI助手
 
@@ -147,43 +176,40 @@ tm_read({
 tm_close()
 ```
 
-## 🏗️ 架构设计
+## 🏗️ 分层架构设计
 
-### 重构后的优化架构
-本项目采用了现代化的软件架构设计原则：
+### 架构设计原则
+本项目采用现代化的分层架构设计，遵循以下原则：
 
-#### 🎯 **资源加载优化**
-- **统一配置管理**: 所有配置集中在 `config.js`，避免重复定义
-- **依赖注入**: 在主入口一次性创建资源，通过构造函数注入
-- **消除重复加载**: 彻底解决类内部重复创建资源的问题
+#### 🎯 **分层职责**
+- **配置层 (config/)**: 统一管理所有配置常量，避免硬编码
+- **工具层 (utils/)**: 提供基础工具函数，支撑上层业务
+- **核心层 (core/)**: 定义核心接口和协议处理，确保标准化
+- **业务层 (business/)**: 实现具体业务逻辑，处理核心功能
+- **应用层 (app/)**: 协调各层组件，提供对外服务
 
-#### 🔧 **单一职责原则**
-- **MCPProtocolHandler**: 专门处理MCP协议
-- **ToolExecutor**: 专门负责工具执行逻辑
-- **DataCache**: 专门负责数据缓存管理
-- **EventBroadcaster**: 专门负责事件广播
-- **WebSocketServerManager**: 专门负责WebSocket连接管理
+#### 🔧 **设计原则**
+- **单一职责**: 每个模块只负责一个明确的功能
+- **依赖注入**: 通过构造函数注入依赖，降低耦合
+- **接口隔离**: 定义清晰的接口，便于测试和扩展
+- **开闭原则**: 对扩展开放，对修改封闭
 
-#### 📦 **模块化设计**
+#### 📦 **依赖关系**
 ```
-服务器端架构:
-├── config.js          # 统一配置管理
-├── tools.js           # 工具定义注册表
-├── events.js          # 事件类型常量
-└── server.js          # 主入口（依赖注入）
-
-客户端架构:
-├── WebSocketClient     # WebSocket客户端管理
-├── SettingsManager     # 设置管理
-├── UIStateManager      # UI状态管理
-└── MCPTerminalGUI      # 主控制器（组合模式）
+应用层 (app/)
+    ↓ 依赖
+业务层 (business/)
+    ↓ 依赖  
+核心层 (core/)
+    ↓ 依赖
+工具层 (utils/) + 配置层 (config/)
 ```
 
-### � 性能优化成果
-- **响应速度**: 从3秒优化到200ms内，提升15倍
-- **代码质量**: 职责分离，可维护性大幅提升
-- **资源管理**: 依赖注入，避免重复加载
-- **架构清晰**: 组件间松耦合，易于扩展
+### ⚡ 架构优势
+- **可维护性**: 清晰的分层结构，易于理解和维护
+- **可扩展性**: 松耦合设计，便于添加新功能
+- **可测试性**: 依赖注入，便于单元测试
+- **性能优化**: 避免重复加载，提升响应速度
 
 ## 📦 技术栈
 
