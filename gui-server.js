@@ -1,10 +1,19 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import open from 'open';
+
+// 常量定义
+const DEFAULT_GUI_PORT = 8347;
+const WEBSOCKET_PORT = 8573;
+const SERVER_HOST = 'localhost';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// 专用日志函数 - 输出到stderr但不显示为错误
+function guiLog(message) {
+    process.stderr.write(`[GUI服务器] ${message}\n`);
+}
 
 let server = null;
 let isRunning = false;
@@ -12,9 +21,9 @@ let isRunning = false;
 /**
  * 启动GUI Web服务器
  */
-export async function startGUIServer(port = 8347) {
+export async function startGUIServer(port = DEFAULT_GUI_PORT) {
     if (isRunning) {
-        console.log('GUI Web服务器已在运行');
+        guiLog('GUI Web服务器已在运行');
         return;
     }
 
@@ -34,7 +43,7 @@ export async function startGUIServer(port = 8347) {
         res.json({
             status: 'running',
             timestamp: new Date().toISOString(),
-            websocketPort: 8573
+            websocketPort: WEBSOCKET_PORT
         });
     });
     
@@ -44,11 +53,9 @@ export async function startGUIServer(port = 8347) {
     });
     
     // 启动服务器
-    server = app.listen(port, 'localhost', () => {
-        console.log(`GUI Web服务器已启动: http://localhost:${port}`);
+    server = app.listen(port, SERVER_HOST, () => {
+        guiLog(`GUI Web服务器已启动: http://localhost:${port}`);
         isRunning = true;
-
-        // 注意：浏览器打开由MCP服务器统一管理，这里不自动打开
     });
     
     server.on('error', (error) => {
@@ -63,7 +70,7 @@ export async function startGUIServer(port = 8347) {
 export function stopGUIServer() {
     if (server && isRunning) {
         server.close(() => {
-            console.log('GUI Web服务器已停止');
+            guiLog('GUI Web服务器已停止');
             isRunning = false;
             server = null;
         });
@@ -82,6 +89,6 @@ export function getServerStatus() {
 
 // 如果直接运行此文件，启动服务器
 if (import.meta.url === `file://${process.argv[1]}`) {
-    const port = process.env.GUI_PORT || 8347;
+    const port = process.env.GUI_PORT || DEFAULT_GUI_PORT;
     startGUIServer(port).catch(console.error);
 }

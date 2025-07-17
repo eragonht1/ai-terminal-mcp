@@ -1,19 +1,252 @@
 #!/usr/bin/env node
 import { TerminalManager } from './terminal-manager.js';
 import { WebSocketBridge } from './websocket-bridge.js';
+import { AppConfig } from './config.js';
+import { ToolRegistry } from './tools.js';
 
-class MCPTerminalServer {
-    constructor() {
-        this.tm = new TerminalManager();
-        this.wsBridge = new WebSocketBridge(8573);
+// 专用日志函数 - 输出到stderr但不显示为错误
+function serverLog(message) {
+    process.stderr.write(`[MCP服务器] ${message}\n`);
+}
 
-        // 监听终端管理器事件并广播到GUI
+/**
+ * MCP协议处理器 - 专门负责MCP协议的请求和响应
+ */
+class MCPProtocolHandler {
+    constructor(config, toolRegistry) {
+        this.config = config;
+        this.toolRegistry = toolRegistry;
+    }
+
+    /**
+     * 处理初始化请求
+     */
+    handleInitialize() {
+        return {
+            protocolVersion: this.config.mcpConfig.PROTOCOL_VERSION,
+            capabilities: { tools: {} },
+            serverInfo: {
+                name: this.config.mcpConfig.SERVER_NAME,
+                version: this.config.mcpConfig.SERVER_VERSION
+            }
+        };
+    }
+
+    /**
+     * 处理工具列表请求
+     */
+    handleToolsList() {
+        return { tools: this.toolRegistry.getTools() };
+    }
+
+    /**
+     * 发送成功响应
+     */
+    sendResponse(id, result) {
+        console.log(JSON.stringify({ jsonrpc: '2.0', id, result }));
+    }
+
+    /**
+     * 发送错误响应
+     */
+    sendError(id, code, message) {
+        console.log(JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } }));
+    }
+}
+
+/**
+ * 工具执行器 - 专门负责工具的执行逻辑
+ */
+class ToolExecutor {
+    constructor(config, terminalManager, eventBroadcaster) {
+        this.config = config;
+        this.terminalManager = terminalManager;
+        this.eventBroadcaster = eventBroadcaster;
+    }
+
+    /**
+     * 创建时间戳
+     */
+    _createTimestamp() {
+        return new Date().toISOString();
+    }
+
+    /**
+     * 验证必需参数
+     */
+    _validateRequiredParams(args, requiredParams) {
+        for (const param of requiredParams) {
+            if (!args[param]) {
+                throw new Error(`缺少必需参数: ${param}`);
+            }
+        }
+    }
+
+    /**
+     * 创建工具执行结果
+     */
+    _createToolResult(success, data, timestamp) {
+        return { success, ...data, timestamp };
+    }
+
+    /**
+     * 执行tm_execute工具
+     */
+    async executeTerminalCommand(args) {
+        const {
+            command,
+            terminal_type = this.config.terminalConfig.DEFAULT_TYPE,
+            cwd,
+            timeout = this.config.terminalConfig.DEFAULT_TIMEOUT
+        } = args;
+
+        this._validateRequiredParams(args, ['command', 'cwd']);
+
+        const sessionResult = this.terminalManager.createSession(terminal_type, cwd);
+        const sessionId = sessionResult.sessionId;
+
+        // 广播会话创建状态
+        this.eventBroadcaster('tm_execute', args, sessionId, this.config.toolStatus.SESSION_CREATED);
+
+        const output = await this.terminalManager.executeCommand(sessionId, command, timeout);
+
+        // 广播执行完成
+        this.eventBroadcaster('tm_execute', args, sessionId, this.config.toolStatus.COMPLETED);
+
+        return this._createToolResult(true, {
+            sessionId,
+            command,
+            output: output.filter(l => l.trim())
+        }, this._createTimestamp());
+    }
+
+    /**
+     * 执行tm_read工具
+     */
+    async executeReadSession(args) {
+        const { session_id: readSid } = args;
+        this._validateRequiredParams(args, ['session_id']);
+
+        this.eventBroadcaster('tm_read', args, readSid, this.config.toolStatus.EXECUTING);
+
+        const readOutput = this.terminalManager.readSessionOutput(readSid);
+        const sessionInfo = this.terminalManager.getSessionInfo(readSid);
+
+        this.eventBroadcaster('tm_read', args, readSid, this.config.toolStatus.COMPLETED);
+
+        return this._createToolResult(true, {
+            sessionId: readSid,
+            output: readOutput.filter(l => l.trim()),
+            sessionInfo
+        }, this._createTimestamp());
+    }
+
+    /**
+     * 执行tm_write工具
+     */
+    async executeWriteSession(args) {
+        const { session_id: writeSid, input, add_newline = true } = args;
+        this._validateRequiredParams(args, ['session_id']);
+        if (input === undefined) throw new Error('缺少必需参数: input');
+
+        this.eventBroadcaster('tm_write', args, writeSid, this.config.toolStatus.EXECUTING);
+
+        this.terminalManager.writeToSession(writeSid, input, add_newline);
+
+        this.eventBroadcaster('tm_write', args, writeSid, this.config.toolStatus.COMPLETED);
+
+        return this._createToolResult(true, {
+            sessionId: writeSid,
+            input
+        }, this._createTimestamp());
+    }
+
+    /**
+     * 执行tm_list工具
+     */
+    async executeListSessions(args) {
+        this.eventBroadcaster('tm_list', args, null, this.config.toolStatus.EXECUTING);
+
+        const sessions = this.terminalManager.getAllSessions();
+
+        this.eventBroadcaster('tm_list', args, null, this.config.toolStatus.COMPLETED);
+
+        return this._createToolResult(true, {
+            sessions,
+            totalSessions: sessions.length
+        }, this._createTimestamp());
+    }
+
+    /**
+     * 执行tm_close工具
+     */
+    async executeCloseSessions(args) {
+        this.eventBroadcaster('tm_close', args, null, this.config.toolStatus.EXECUTING);
+
+        const closeResult = this.terminalManager.closeAllSessions();
+
+        this.eventBroadcaster('tm_close', args, null, this.config.toolStatus.COMPLETED);
+
+        return this._createToolResult(closeResult.success, {
+            message: closeResult.message,
+            closedSessions: closeResult.closedSessions,
+            failedSessions: closeResult.failedSessions,
+            totalClosed: closeResult.totalClosed,
+            totalFailed: closeResult.totalFailed
+        }, this._createTimestamp());
+    }
+
+    /**
+     * 执行工具
+     */
+    async executeTool(name, args) {
+        try {
+            // 广播工具调用开始
+            this.eventBroadcaster(name, args, null, this.config.toolStatus.EXECUTING);
+
+            switch (name) {
+                case 'tm_execute':
+                    return await this.executeTerminalCommand(args);
+                case 'tm_read':
+                    return await this.executeReadSession(args);
+                case 'tm_write':
+                    return await this.executeWriteSession(args);
+                case 'tm_list':
+                    return await this.executeListSessions(args);
+                case 'tm_close':
+                    return await this.executeCloseSessions(args);
+                default:
+                    throw new Error(`未知工具: ${name}`);
+            }
+        } catch (e) {
+            // 广播错误事件
+            this.eventBroadcaster(name, args, null, 'error', e);
+            return this._createToolResult(false, { error: e.message }, this._createTimestamp());
+        }
+    }
+}
+
+/**
+ * 服务器协调器 - 协调各个组件，处理主要的服务器逻辑
+ */
+class ServerOrchestrator {
+    constructor(config, terminalManager, webSocketBridge, protocolHandler, toolExecutor) {
+        this.config = config;
+        this.terminalManager = terminalManager;
+        this.webSocketBridge = webSocketBridge;
+        this.protocolHandler = protocolHandler;
+        this.toolExecutor = toolExecutor;
+
+        // 设置事件监听
         this.setupEventListeners();
 
         // 初始化GUI服务器
         this.initializeGUI();
     }
 
+    /**
+     * 启动服务器
+     */
     start() {
         process.stdin.setEncoding('utf8').resume();
         process.stdin.on('data', data => {
@@ -29,252 +262,62 @@ class MCPTerminalServer {
         );
     }
 
+    /**
+     * 处理输入
+     */
     handleInput(input) {
         try {
             this.handleRequest(JSON.parse(input));
         } catch (e) {
-            this.sendError(null, -32700, 'Parse error');
+            this.protocolHandler.sendError(null, this.config.errorCodes.PARSE_ERROR, 'Parse error');
         }
     }
 
+    /**
+     * 处理请求
+     */
     async handleRequest({ id, method, params }) {
         try {
             switch (method) {
                 case 'initialize':
-                    this.send(id, {
-                        protocolVersion: '2024-11-05',
-                        capabilities: { tools: {} },
-                        serverInfo: { name: 'mcp-terminal-server', version: '1.1.0' }
-                    });
+                    this.protocolHandler.sendResponse(id, this.protocolHandler.handleInitialize());
                     break;
                 case 'tools/list':
-                    this.send(id, { tools: this.getTools() });
+                    this.protocolHandler.sendResponse(id, this.protocolHandler.handleToolsList());
                     break;
                 case 'tools/call':
-                    this.send(id, { content: [{ type: 'text', text: JSON.stringify(await this.callTool(params), null, 2) }] });
+                    const result = await this.toolExecutor.executeTool(params.name, params.arguments);
+                    this.protocolHandler.sendResponse(id, {
+                        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }]
+                    });
                     break;
                 default:
-                    this.sendError(id, -32601, 'Method not found');
+                    this.protocolHandler.sendError(id, this.config.errorCodes.METHOD_NOT_FOUND, 'Method not found');
             }
         } catch (e) {
-            this.sendError(id, -32603, 'Internal error');
+            this.protocolHandler.sendError(id, this.config.errorCodes.INTERNAL_ERROR, 'Internal error');
         }
-    }
-
-    getTools() {
-        return [
-            {
-                name: 'tm_execute',
-                description: '执行命令（支持PowerShell和CMD终端，必须指定工作目录的绝对路径）',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        command: {
-                            type: 'string',
-                            description: '要执行的命令'
-                        },
-                        cwd: {
-                            type: 'string',
-                            description: '工作目录的绝对路径'
-                        },
-                        terminal_type: {
-                            type: 'string',
-                            enum: ['powershell', 'cmd'],
-                            default: 'powershell',
-                            description: '终端类型（powershell=Windows PowerShell，cmd=命令提示符）'
-                        },
-
-                        timeout: {
-                            type: 'number',
-                            default: 5000,
-                            description: '超时时间（毫秒），默认5秒'
-                        }
-                    },
-                    required: ['command', 'cwd']
-                }
-            },
-            {
-                name: 'tm_read',
-                description: '获取会话的所有输出结果',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        session_id: {
-                            type: 'string',
-                            description: '要读取的会话ID'
-                        }
-                    },
-                    required: ['session_id']
-                }
-            },
-            {
-                name: 'tm_write',
-                description: '向终端会话追加命令或编写文本内容',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        session_id: {
-                            type: 'string',
-                            description: '目标会话ID'
-                        },
-                        input: {
-                            type: 'string',
-                            description: '要输入的命令或文本内容'
-                        },
-                        add_newline: {
-                            type: 'boolean',
-                            default: true,
-                            description: '是否添加换行符执行命令（true=追加命令并执行，false=仅编写文本内容）'
-                        }
-                    },
-                    required: ['session_id', 'input']
-                }
-            },
-            {
-                name: 'tm_list',
-                description: '列出所有活跃的终端会话',
-                inputSchema: {
-                    type: 'object',
-                    properties: {},
-                    required: []
-                }
-            },
-            {
-                name: 'tm_close',
-                description: '一键关闭所有活跃的终端会话',
-                inputSchema: {
-                    type: 'object',
-                    properties: {},
-                    required: []
-                }
-            }
-        ];
-    }
-
-    async callTool({ name, arguments: args }) {
-        const timestamp = new Date().toISOString();
-
-        // 智能浏览器管理
-        await this.manageBrowser();
-
-        try {
-            // 广播工具调用开始
-            this.wsBridge.broadcastToolCall(name, args, null, 'executing');
-
-            switch (name) {
-                case 'tm_execute':
-                    const { command, terminal_type = 'powershell', cwd, timeout = 5000 } = args;
-                    if (!command || !cwd) throw new Error('缺少必需参数');
-
-                    const sessionResult = this.tm.createSession(terminal_type, cwd);
-                    const sessionId = sessionResult.sessionId;
-
-                    // 广播工具调用状态更新
-                    this.wsBridge.broadcastToolCall(name, args, sessionId, 'session_created');
-
-                    const output = await this.tm.executeCommand(sessionId, command, timeout);
-
-                    // 广播工具调用完成
-                    this.wsBridge.broadcastToolCall(name, args, sessionId, 'completed');
-
-                    return { success: true, sessionId, command, output: output.filter(l => l.trim()), timestamp };
-
-                case 'tm_read':
-                    const { session_id: readSid } = args;
-                    if (!readSid) throw new Error('缺少session_id');
-
-                    // 广播工具调用状态
-                    this.wsBridge.broadcastToolCall(name, args, readSid, 'executing');
-
-                    const readOutput = this.tm.readSessionOutput(readSid);
-                    const sessionInfo = this.tm.getSessionInfo(readSid);
-
-                    // 广播工具调用完成
-                    this.wsBridge.broadcastToolCall(name, args, readSid, 'completed');
-
-                    return { success: true, sessionId: readSid, output: readOutput.filter(l => l.trim()), sessionInfo, timestamp };
-
-                case 'tm_write':
-                    const { session_id: writeSid, input, add_newline = true } = args;
-                    if (!writeSid || input === undefined) throw new Error('缺少必需参数');
-
-                    // 广播工具调用状态
-                    this.wsBridge.broadcastToolCall(name, args, writeSid, 'executing');
-
-                    this.tm.writeToSession(writeSid, input, add_newline);
-
-                    // 广播工具调用完成
-                    this.wsBridge.broadcastToolCall(name, args, writeSid, 'completed');
-
-                    return { success: true, sessionId: writeSid, input, timestamp };
-
-                case 'tm_list':
-                    // 广播工具调用状态
-                    this.wsBridge.broadcastToolCall(name, args, null, 'executing');
-
-                    const sessions = this.tm.getAllSessions();
-
-                    // 广播工具调用完成
-                    this.wsBridge.broadcastToolCall(name, args, null, 'completed');
-
-                    return { success: true, sessions, totalSessions: sessions.length, timestamp };
-
-                case 'tm_close':
-                    // 广播工具调用状态
-                    this.wsBridge.broadcastToolCall(name, args, null, 'executing');
-
-                    const closeResult = this.tm.closeAllSessions();
-
-                    // 广播工具调用完成
-                    this.wsBridge.broadcastToolCall(name, args, null, 'completed');
-
-                    return {
-                        success: closeResult.success,
-                        message: closeResult.message,
-                        closedSessions: closeResult.closedSessions,
-                        failedSessions: closeResult.failedSessions,
-                        totalClosed: closeResult.totalClosed,
-                        totalFailed: closeResult.totalFailed,
-                        timestamp
-                    };
-
-                default:
-                    throw new Error(`未知工具: ${name}`);
-            }
-        } catch (e) {
-            // 广播错误事件
-            this.wsBridge.broadcastError(null, e, { tool: name, args });
-            return { success: false, error: e.message, timestamp };
-        }
-    }
-
-    send(id, result) {
-        console.log(JSON.stringify({ jsonrpc: '2.0', id, result }));
-    }
-
-    sendError(id, code, message) {
-        console.log(JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } }));
     }
 
     /**
      * 设置事件监听器，将终端事件广播到GUI
      */
     setupEventListeners() {
-        // 监听终端管理器的事件（需要在terminal-manager.js中添加事件发射）
-        this.tm.on('sessionCreated', (sessionData) => {
-            this.wsBridge.broadcastSessionCreated(sessionData);
+        // 监听终端管理器的事件
+        this.terminalManager.on('sessionCreated', (sessionData) => {
+            this.webSocketBridge.broadcastSessionCreated(sessionData);
         });
 
-        this.tm.on('outputReceived', (sessionId, output) => {
-            this.wsBridge.broadcastTerminalOutput(sessionId, output);
+        this.terminalManager.on('outputReceived', (sessionId, output) => {
+            this.webSocketBridge.broadcastTerminalOutput(sessionId, output);
         });
 
-        this.tm.on('sessionClosed', (sessionId, exitCode) => {
-            this.wsBridge.broadcastSessionClosed(sessionId, exitCode);
+        this.terminalManager.on('sessionClosed', (sessionId, exitCode) => {
+            this.webSocketBridge.broadcastSessionClosed(sessionId, exitCode);
         });
 
-        this.tm.on('errorOccurred', (sessionId, error, context) => {
-            this.wsBridge.broadcastError(sessionId, error, context);
+        this.terminalManager.on('errorOccurred', (sessionId, error, context) => {
+            this.webSocketBridge.broadcastError(sessionId, error, context);
         });
     }
 
@@ -284,18 +327,18 @@ class MCPTerminalServer {
     async initializeGUI() {
         try {
             // 检测WebSocket服务器是否已启动
-            if (!this.wsBridge.isRunning) {
+            if (!this.webSocketBridge.isRunning) {
                 // 只有WebSocket服务器未启动时，才启动两个服务器
-                console.log('启动WebSocket服务器...');
-                this.wsBridge.start();
+                serverLog('启动WebSocket服务器...');
+                this.webSocketBridge.start();
 
-                console.log('启动GUI Web服务器...');
+                serverLog('启动GUI Web服务器...');
                 const { startGUIServer } = await import('./gui-server.js');
                 await startGUIServer();
 
-                console.log('GUI服务器启动完成');
+                serverLog('GUI服务器启动完成');
             } else {
-                console.log('GUI服务器已在运行，跳过启动');
+                serverLog('GUI服务器已在运行，跳过启动');
             }
         } catch (error) {
             console.error('初始化GUI服务器失败:', error);
@@ -303,57 +346,80 @@ class MCPTerminalServer {
     }
 
     /**
-     * 智能浏览器管理
-     */
-    async manageBrowser() {
-        try {
-            // 检测WebSocket连接状态
-            const hasConnections = this.wsBridge.hasActiveConnections();
-            if (!hasConnections) {
-                console.log('检测到浏览器已关闭，重新打开浏览器...');
-                await this.openBrowser();
-            }
-        } catch (error) {
-            console.error('浏览器管理失败:', error);
-        }
-    }
-
-
-
-    /**
-     * 打开浏览器显示GUI界面
-     */
-    async openBrowser() {
-        try {
-            const open = (await import('open')).default;
-            await open('http://localhost:8347');
-            console.log('浏览器已打开GUI界面');
-        } catch (error) {
-            console.error('打开浏览器失败:', error);
-        }
-    }
-
-    /**
      * 清理资源
      */
     async cleanup() {
-        console.log('正在清理资源...');
+        serverLog('正在清理资源...');
 
         // 清理终端管理器
-        this.tm.cleanup();
+        this.terminalManager.cleanup();
 
         // 清理WebSocket服务器
-        this.wsBridge.cleanup();
+        this.webSocketBridge.cleanup();
 
         // 清理GUI Web服务器
         try {
             const { stopGUIServer } = await import('./gui-server.js');
             stopGUIServer();
-            console.log('GUI Web服务器已清理');
+            serverLog('GUI Web服务器已清理');
         } catch (error) {
             console.error('清理GUI Web服务器失败:', error);
         }
     }
 }
 
-new MCPTerminalServer().start();
+// ============================================================================
+// 主入口 - 在这里进行资源的一次性加载和依赖注入
+// ============================================================================
+
+/**
+ * 主入口函数 - 负责创建所有资源并进行依赖注入
+ */
+function main() {
+    // 1. 创建配置对象（只加载一次）
+    const config = new AppConfig();
+
+    // 2. 创建工具注册表（只加载一次）
+    const toolRegistry = new ToolRegistry(config);
+
+    // 3. 创建终端管理器（注入配置）
+    const terminalManager = new TerminalManager(config);
+
+    // 4. 创建WebSocket桥接器（注入配置）
+    const webSocketBridge = new WebSocketBridge(config);
+
+    // 5. 创建MCP协议处理器（注入配置和工具注册表）
+    const protocolHandler = new MCPProtocolHandler(config, toolRegistry);
+
+    // 6. 创建工具执行器（注入依赖）
+    const toolExecutor = new ToolExecutor(
+        config,
+        terminalManager,
+        (name, args, sessionId, status, error = null) => {
+            if (status === 'error') {
+                webSocketBridge.broadcastError(sessionId, error, { tool: name, args });
+            } else {
+                webSocketBridge.broadcastToolCall(name, args, sessionId, status);
+            }
+        }
+    );
+
+    // 7. 创建服务器协调器（注入所有依赖）
+    const server = new ServerOrchestrator(
+        config,
+        terminalManager,
+        webSocketBridge,
+        protocolHandler,
+        toolExecutor
+    );
+
+    // 8. 启动服务器
+    server.start();
+
+    serverLog('MCP Terminal Server 已启动，所有资源已完成依赖注入');
+}
+
+// 只有在直接运行此文件时才执行主函数
+if (import.meta.url.endsWith('server.js')) {
+    main();
+}

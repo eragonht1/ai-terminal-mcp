@@ -4,32 +4,34 @@ import path from 'path';
 import { EventEmitter } from 'events';
 
 export class TerminalManager extends EventEmitter {
-    constructor() {
+    constructor(config) {
         super();
+        this.config = config;
         this.sessions = new Map();
-        this.maxLines = 1000;
-        this.timeout = 3600000; // 1小时
-        this.psRegex = /PS\s+[A-Z]:\\[^>]*>\s*$/i;
-        this.cmdRegex = /[A-Za-z]:\\[^>]*>\s*$/i;
 
-        setInterval(() => this.cleanup(), 600000); // 10分钟清理
+        // 从配置中获取设置，而不是硬编码常量
+        this.maxLines = config.terminalConfig.MAX_OUTPUT_LINES;
+        this.timeout = config.terminalConfig.SESSION_TIMEOUT;
+        this.psRegex = config.terminalRegex.PS_PROMPT;
+        this.cmdRegex = config.terminalRegex.CMD_PROMPT;
+        this.genericRegex = config.terminalRegex.GENERIC_PROMPT;
+
+        // 启动清理定时器
+        setInterval(() => this.cleanup(), config.terminalConfig.CLEANUP_INTERVAL);
     }
 
-    createSession(type = 'powershell', cwd, id = null) {
-        if (!cwd || !path.isAbsolute(cwd)) throw new Error('需要绝对路径');
+    /**
+     * 获取终端可执行文件路径
+     */
+    _getShellPath(type) {
+        return this.config.getShellPath(type);
+    }
 
-        const sessionId = id || randomUUID();
-        const shell = type === 'powershell' ? 'C:\\Program Files\\PowerShell\\7\\pwsh.exe' : 'cmd.exe';
-
-        const ptyProcess = pty.spawn(shell, [], {
-            name: 'xterm-color',
-            cols: 80,
-            rows: 30,
-            cwd,
-            env: process.env
-        });
-
-        const session = {
+    /**
+     * 创建会话数据对象
+     */
+    _createSessionData(sessionId, ptyProcess, type, cwd) {
+        return {
             id: sessionId,
             ptyProcess,
             output: [],
@@ -39,6 +41,48 @@ export class TerminalManager extends EventEmitter {
             createdAt: new Date(),
             lastActivity: new Date()
         };
+    }
+
+    /**
+     * 创建会话返回数据
+     */
+    _createSessionResult(sessionId, type, cwd, pid) {
+        return { sessionId, type, cwd, status: 'active', pid };
+    }
+
+    /**
+     * 构建会话信息对象
+     */
+    _buildSessionInfo(session) {
+        return {
+            sessionId: session.id,
+            type: session.type,
+            cwd: session.cwd,
+            status: session.status,
+            pid: session.ptyProcess.pid,
+            createdAt: session.createdAt,
+            lastActivity: session.lastActivity,
+            outputLines: session.output.length
+        };
+    }
+
+    createSession(type = null, cwd, id = null) {
+        if (!cwd || !path.isAbsolute(cwd)) throw new Error('需要绝对路径');
+
+        // 使用配置中的默认终端类型
+        const terminalType = type || this.config.terminalConfig.DEFAULT_TYPE;
+        const sessionId = id || randomUUID();
+        const shell = this._getShellPath(terminalType);
+
+        const ptyProcess = pty.spawn(shell, [], {
+            name: this.config.terminalConfig.TERMINAL_NAME,
+            cols: this.config.terminalConfig.DEFAULT_COLS,
+            rows: this.config.terminalConfig.DEFAULT_ROWS,
+            cwd,
+            env: process.env
+        });
+
+        const session = this._createSessionData(sessionId, ptyProcess, terminalType, cwd);
 
         ptyProcess.onData(data => this.appendOutput(sessionId, data));
         ptyProcess.onExit(code => {
@@ -54,7 +98,7 @@ export class TerminalManager extends EventEmitter {
         this.sessions.set(sessionId, session);
 
         // 发射会话创建事件
-        const sessionData = { sessionId, type, cwd, status: 'active', pid: ptyProcess.pid };
+        const sessionData = this._createSessionResult(sessionId, terminalType, cwd, ptyProcess.pid);
         this.emit('sessionCreated', sessionData);
 
         return sessionData;
@@ -138,29 +182,11 @@ export class TerminalManager extends EventEmitter {
         const session = this.sessions.get(sessionId);
         if (!session) throw new Error(`会话不存在: ${sessionId}`);
 
-        return {
-            sessionId: session.id,
-            type: session.type,
-            cwd: session.cwd,
-            status: session.status,
-            pid: session.ptyProcess.pid,
-            createdAt: session.createdAt,
-            lastActivity: session.lastActivity,
-            outputLines: session.output.length
-        };
+        return this._buildSessionInfo(session);
     }
 
     getAllSessions() {
-        return Array.from(this.sessions.values()).map(session => ({
-            sessionId: session.id,
-            type: session.type,
-            cwd: session.cwd,
-            status: session.status,
-            pid: session.ptyProcess.pid,
-            createdAt: session.createdAt,
-            lastActivity: session.lastActivity,
-            outputLines: session.output.length
-        }));
+        return Array.from(this.sessions.values()).map(session => this._buildSessionInfo(session));
     }
 
     appendOutput(sessionId, data) {
@@ -206,7 +232,7 @@ export class TerminalManager extends EventEmitter {
 
                     const hasPrompt = session.type === 'powershell'
                         ? this.psRegex.test(lastLines)
-                        : this.cmdRegex.test(lastLines) || />\s*$/.test(lastLines);
+                        : this.cmdRegex.test(lastLines) || this.genericRegex.test(lastLines);
 
                     if (hasPrompt) {
                         clearTimeout(timeoutId);

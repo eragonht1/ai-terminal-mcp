@@ -2,375 +2,215 @@
 
 基于Node.js的MCP服务器，支持Windows终端（CMD和PowerShell）执行命令并管理会话。
 
-## 🎉 新功能：AI操作可视化GUI界面
+## ✨ 特性
 
-**重大更新！** 现在包含完整的Web GUI界面，让AI操作终端的过程完全透明化！
+- **🖥️ 多终端支持**: 支持PowerShell和CMD终端
+- **� 会话管理**: 同时管理多个终端会话，每个会话独立ID
+- **🎨 可视化GUI**: 实时显示AI操作过程的Web界面
+- **⚡ 高性能**: 优化的架构设计，响应时间<200ms
+- **� 智能管理**: 自动清理资源，防止内存泄漏
+- **� WebSocket通信**: 实时数据传输，支持多客户端连接
 
-### 🚀 GUI特性
-- **🔄 智能启动**: AI首次调用MCP工具时自动弹出GUI界面
-- **🧠 智能检测**: 检测浏览器关闭状态，自动重新打开GUI界面
-- **👁️ 操作透明化**: 实时显示AI的每个操作步骤
-- **⚡ 实时数据流**: WebSocket实时传输，延迟<200ms
-- **📊 多会话管理**: 标签式界面，支持并发会话
-- **🎨 专业设计**: VS Code风格的深色主题
-- **⚙️ 个性化设置**: 字体大小、主题、时间戳等可配置
-- **🔧 完美清理**: VSCode重启时自动清理所有资源，避免端口冲突
+## 🌐 GUI界面
 
-### 🌐 GUI访问
-当AI调用MCP工具时，GUI界面会自动在浏览器中打开：
+启动服务器后，可通过以下地址访问可视化界面：
 ```
 http://localhost:8347
 ```
 
-### 🔍 智能浏览器管理系统
-- **多进程共享**: 多个AI软件共享同一个GUI服务器，避免端口冲突
-- **智能检测**: 检测WebSocket服务器状态，只有未启动才启动服务器
-- **连接管理**: 每次工具调用检查WebSocket连接状态
-- **智能重启**: 浏览器关闭后，下次工具调用时自动重新打开
-- **服务器保持**: GUI和WebSocket服务器在MCP连接时启动，持续运行
-- **完美清理**: MCP进程退出时完全清理所有服务器资源
-- **零冲突**: 完美支持多个AI软件同时使用，无端口冲突问题
+GUI界面提供：
+- 实时终端输出显示
+- 多会话标签管理
+- AI操作过程透明化
+- 专业的VS Code风格界面
 
-## 核心功能特性
+## � 系统要求
 
-### 🖥️ 终端功能
-- ✅ **多终端支持**: 支持PowerShell和CMD终端
-- ✅ **会话管理**: 能够同时管理多个终端会话，每个会话有独立的ID
-- ✅ **智能内存管理**: 自动清理不活跃会话，防止内存泄漏
-- ✅ **快速响应**: 优化的提示符识别算法，响应时间从3秒降至200ms内
-- ✅ **错误处理**: 当命令执行失败时能够返回清晰的错误信息
-- ✅ **灵活输入**: 支持命令执行和文本编写两种模式
-- ✅ **输出缓存**: 能够保存命令的历史输出，方便后续查看
+- **操作系统**: Windows 10/11
+- **Node.js**: >= 18.0.0
+- **PowerShell**: 7.x (路径: `C:\Program Files\PowerShell\7\pwsh.exe`)
 
-### 🎨 GUI可视化功能
-- ✅ **AI操作透明化**: 完整显示AI操作终端的过程
-- ✅ **实时流式显示**: 使用xterm.js实现专业终端体验
-- ✅ **智能界面管理**: AI调用时自动启动GUI，浏览器关闭后智能重启
-- ✅ **多会话可视化**: 标签式管理，支持多个会话并发显示
-- ✅ **WebSocket通信**: 实时数据传输，延迟极低
-- ✅ **专业界面设计**: VS Code风格，深色主题，用户体验优秀
+## 🚀 快速开始
 
-### 🔧 技术优化
-- ✅ **多进程共享机制**: 完美支持多个AI软件共享同一个GUI服务器
-- ✅ **智能服务器检测**: 基于WebSocket服务器状态检测，避免重复启动
-- ✅ **零端口冲突**: 多个MCP进程智能协调，无端口占用冲突
-- ✅ **连接状态检测**: 简单高效的WebSocket连接检测，性能提升显著
-- ✅ **资源清理机制**: 完整的服务器清理，确保VSCode重启后无端口冲突
-- ✅ **模块化架构**: GUI系统采用模块化设计，易于维护和扩展
-
-## 系统要求
-
-- Windows 10系统
-- Node.js >= 18.0.0
-- PowerShell 7终端支持（路径：`C:\Program Files\PowerShell\7`）
-
-## 安装
-
+### 1. 安装依赖
 ```bash
 npm install
 ```
 
-## 启动服务器
-
+### 2. 启动服务器
 ```bash
+# 生产环境
 npm start
+
+# 开发环境（支持热重载）
+nodemon server.js
 ```
 
-## 配置AI助手
+### 3. 访问GUI界面
+打开浏览器访问: http://localhost:8347
 
-1. 在配置文件中添加以下内容：
+## 📁 项目结构
+
+```
+ai-terminal-mcp/
+├── 📄 server.js                 # MCP服务器主入口（重构后）
+├── 📄 config.js                 # 统一配置管理
+├── 📄 tools.js                  # 工具定义和注册表
+├── 📄 events.js                 # 事件类型常量定义
+├── 📄 terminal-manager.js       # 终端会话管理器
+├── 📄 websocket-bridge.js       # WebSocket通信桥（重构后）
+├── 📄 gui-server.js             # GUI Web服务器
+├── 📄 package.json              # 项目配置和依赖
+├── 📄 README.md                 # 项目说明文档
+└── 📁 gui/                      # GUI界面文件
+    ├── 📄 index.html             # 主界面HTML
+    ├── 📄 app.js                 # 主应用逻辑（重构后）
+    ├── 📄 session-manager.js     # 会话管理器
+    ├── 📄 terminal-renderer.js   # 终端渲染器
+    └── 📄 styles.css             # 界面样式
+```
+
+### 📋 核心文件说明
+
+#### 🔧 服务器端（重构后的架构）
+- **`server.js`** - 主入口，采用依赖注入和职责分离的架构设计
+- **`config.js`** - 统一配置管理，所有常量和配置集中管理
+- **`tools.js`** - 工具定义注册表，管理所有MCP工具
+- **`events.js`** - 事件类型常量，统一事件管理
+- **`terminal-manager.js`** - 终端会话管理，支持多会话并发
+- **`websocket-bridge.js`** - WebSocket通信桥，分离数据缓存、事件广播等职责
+- **`gui-server.js`** - GUI Web服务器，提供静态文件服务
+
+#### 🎨 客户端（重构后的架构）
+- **`gui/app.js`** - 主应用逻辑，分离WebSocket客户端、UI状态管理、设置管理
+- **`gui/session-manager.js`** - 会话管理器，处理多会话标签
+- **`gui/terminal-renderer.js`** - 终端渲染器，基于xterm.js
+- **`gui/index.html`** - 主界面HTML结构
+- **`gui/styles.css`** - VS Code风格的界面样式
+
+## ⚙️ 配置AI助手
+
+### Claude Desktop配置
+在Claude Desktop的配置文件中添加：
 
 ```json
 {
   "mcpServers": {
     "ai-terminal-mcp": {
       "command": "node",
-      "args": ["G:\\docker\\McpApi\\ai-terminal-mcp\\server.js"],
-      "cwd": "G:\\docker\\McpApi\\ai-terminal-mcp",
-      "env": {}
+      "args": ["你的项目路径\\server.js"],
+      "cwd": "你的项目路径"
     }
   }
 }
 ```
 
-2. 重启VSCode
-
-### 其他AI助手配置
-
-对于支持MCP协议的其他AI助手，请参考以下通用配置：
-
+### 其他AI助手
+对于支持MCP协议的AI助手，使用以下配置：
 - **命令**: `node`
-- **参数**: `["G:\\docker\\McpApi\\ai-terminal-mcp\\server.js"]`
-- **工作目录**: `G:\\docker\\McpApi\\ai-terminal-mcp`
+- **参数**: `["项目路径\\server.js"]`
 - **协议**: MCP (Model Context Protocol)
 - **通信方式**: STDIO
 
-### 配置验证
+配置完成后重启AI助手，即可使用5个终端工具。
 
-配置完成后，可使用5个工具：`tm_execute`、`tm_read`、`tm_write`、`tm_list`、`tm_close`
+## 🛠️ 可用工具
 
-## 提供的工具
+| 工具名 | 功能 | 主要参数 |
+|--------|------|----------|
+| **tm_execute** | 执行命令并创建新会话 | `command`, `cwd`, `terminal_type` |
+| **tm_read** | 读取会话输出 | `session_id` |
+| **tm_write** | 向会话写入命令或文本 | `session_id`, `input`, `add_newline` |
+| **tm_list** | 列出所有活跃会话 | 无参数 |
+| **tm_close** | 关闭所有会话 | 无参数 |
 
-### 1. tm_execute - 执行命令
-执行命令（支持PowerShell和CMD终端，必须指定工作目录的绝对路径）
-
-**参数:**
-- `command` (string, 必需): 要执行的命令
-- `cwd` (string, 必需): 工作目录的绝对路径
-- `terminal_type` (string, 可选): 终端类型（powershell=Windows PowerShell，cmd=命令提示符），默认 'powershell'
-- `timeout` (number, 可选): 超时时间（毫秒），默认 5000
-
-**说明:** 总是创建新会话并返回sessionId，用于后续操作
-
-### 2. tm_read - 获取结果
-获取会话的所有输出结果
-
-**参数:**
-- `session_id` (string, 必需): 要读取的会话ID
-
-**说明:** 返回指定会话的完整输出内容
-
-### 3. tm_write - 追加命令或编写文本
-向终端会话追加命令或编写文本内容
-
-**参数:**
-- `session_id` (string, 必需): 目标会话ID
-- `input` (string, 必需): 要输入的命令或文本内容
-- `add_newline` (boolean, 可选): 是否添加换行符执行命令（true=追加命令并执行，false=仅编写文本内容），默认 true
-
-**说明:** 支持两种模式 - 执行命令或构建文本
-
-### 4. tm_list - 列出所有会话
-列出所有活跃的终端会话
-
-**参数:**
-- 无需参数
-
-**说明:** 返回所有会话的详细信息，包括ID、类型、状态等
-
-### 5. tm_close - 关闭终端
-关闭指定的终端会话
-
-**参数:**
-- `session_id` (string, 必需): 要关闭的会话ID
-
-**说明:** 安全关闭指定会话并清理资源
-
-## 使用示例
-
-### 基本工作流程
-
+### 基本使用流程
 ```javascript
-// 1. 执行命令，创建新会话
+// 1. 执行命令（创建新会话）
 tm_execute({
     command: "dir",
     cwd: "C:\\Users"
 })
-// 返回: { sessionId: "session-123", ... }
 
-// 2. 在同一会话中追加命令
+// 2. 在同一会话中继续操作
 tm_write({
-    session_id: "session-123",
-    input: "echo 'Hello World'",
-    add_newline: true
+    session_id: "返回的会话ID",
+    input: "echo Hello"
 })
 
 // 3. 读取会话输出
 tm_read({
-    session_id: "session-123"
+    session_id: "会话ID"
 })
 
-// 4. 关闭会话
-tm_close({
-    session_id: "session-123"
-})
+// 4. 关闭所有会话
+tm_close()
 ```
 
-### 高级用法
+## 🏗️ 架构设计
 
-```javascript
-// 构建复杂命令
-tm_write({
-    session_id: "session-123",
-    input: "python -c \"",
-    add_newline: false  // 不执行，继续输入
-})
+### 重构后的优化架构
+本项目采用了现代化的软件架构设计原则：
 
-tm_write({
-    session_id: "session-123",
-    input: "print('Hello')\"",
-    add_newline: true   // 执行完整命令
-})
+#### 🎯 **资源加载优化**
+- **统一配置管理**: 所有配置集中在 `config.js`，避免重复定义
+- **依赖注入**: 在主入口一次性创建资源，通过构造函数注入
+- **消除重复加载**: 彻底解决类内部重复创建资源的问题
 
-// 切换终端类型
-tm_execute({
-    command: "dir",
-    cwd: "C:\\",
-    terminal_type: "cmd"  // 使用CMD而非PowerShell
-})
+#### 🔧 **单一职责原则**
+- **MCPProtocolHandler**: 专门处理MCP协议
+- **ToolExecutor**: 专门负责工具执行逻辑
+- **DataCache**: 专门负责数据缓存管理
+- **EventBroadcaster**: 专门负责事件广播
+- **WebSocketServerManager**: 专门负责WebSocket连接管理
+
+#### 📦 **模块化设计**
+```
+服务器端架构:
+├── config.js          # 统一配置管理
+├── tools.js           # 工具定义注册表
+├── events.js          # 事件类型常量
+└── server.js          # 主入口（依赖注入）
+
+客户端架构:
+├── WebSocketClient     # WebSocket客户端管理
+├── SettingsManager     # 设置管理
+├── UIStateManager      # UI状态管理
+└── MCPTerminalGUI      # 主控制器（组合模式）
 ```
 
+### � 性能优化成果
+- **响应速度**: 从3秒优化到200ms内，提升15倍
+- **代码质量**: 职责分离，可维护性大幅提升
+- **资源管理**: 依赖注入，避免重复加载
+- **架构清晰**: 组件间松耦合，易于扩展
 
-## 技术架构
+## 📦 技术栈
 
-### 🔧 核心文件
-- `server.js`: MCP服务器主文件（已扩展WebSocket功能）
-- `terminal-manager.js`: 终端管理模块（已添加事件广播）
+### 后端
+- **Node.js** - 运行时环境
+- **@lydell/node-pty** - 终端进程管理
+- **ws** - WebSocket服务器
+- **express** - Web服务器
 
-### 🎨 GUI系统文件
-- `websocket-bridge.js`: WebSocket通信桥，实现实时数据传输
-- `gui-server.js`: GUI Web服务器，提供界面访问
-- `launcher.js`: 自动启动器，管理GUI生命周期
-- `gui/`: GUI界面目录
-  - `index.html`: 主界面文件
-  - `app.js`: 应用核心逻辑
-  - `terminal-renderer.js`: xterm.js终端渲染器
-  - `session-manager.js`: 会话管理器
-  - `styles.css`: 界面样式
-
-### 📦 依赖库
-- `@lydell/node-pty`: 预编译的node-pty库
-- `ws`: WebSocket服务器
-- `express`: Web服务器框架
-- `open`: 自动打开浏览器
-- `@xterm/xterm`: 终端模拟器
-- `@xterm/addon-fit`: 终端自适应插件
-- `@xterm/addon-web-links`: 链接识别插件
-
-### 🏗️ 系统架构图
-```
-AI Assistant
-     ↓
-MCP Server (server.js)
-     ↓
-WebSocket Bridge (websocket-bridge.js)
-     ↓
-GUI Interface (gui/)
-     ↓
-xterm.js Terminal Renderer
-```
-
-## 性能优化
-
-### 代码优化成果
-- **代码量减少**: 从878行优化到359行，减少**59.1%**
-- **文件大小减少**: 从27.79KB减少到13.26KB，减少**52.3%**
-- **响应速度提升**: 从平均3秒降低到200ms内，提升**15倍**
-
-### 技术优化
-- **快速响应**: 优化提示符检测，稳定性检测从3次降为1次，检查间隔从150ms降为50ms
-- **内存管理**: 自动清理不活跃会话，防止内存泄漏
-- **智能检测**: 优化命令完成判断，支持多种提示符格式
-- **简化逻辑**: 移除冗余参数和复杂逻辑，提高可维护性
-
-### 用户体验提升
-- **工具描述完善**: 每个工具和参数都有详细说明
-- **参数顺序优化**: 必需参数优先，逻辑更清晰
-- **功能简化**: 移除无效参数，使用更简洁
-- **GUI可视化**: AI操作完全透明，用户体验大幅提升
-
-## 🎨 GUI界面使用指南
-
-### 🚀 智能启动流程
-系统采用完美的分阶段启动机制：
-
-**第一个AI软件连接时**：
-1. 检测WebSocket服务器未启动
-2. 启动WebSocket服务器（端口8573）
-3. 启动GUI Web服务器（端口8347）
-4. 服务器保持运行，等待工具调用
-
-**后续AI软件连接时**：
-1. 检测WebSocket服务器已启动
-2. 跳过服务器启动，直接共享使用
-3. 多个AI软件共享同一个GUI界面
-
-**任何工具调用时**：
-1. 检查WebSocket连接状态
-2. 如果浏览器关闭，自动重新打开
-3. 确保用户始终能看到所有AI的操作过程
-
-### 界面功能
-- **📊 状态栏**: 显示连接状态、会话数量、当前时间
-- **📑 标签栏**: 多会话标签管理，支持切换和关闭
-- **💻 终端区域**: xterm.js实现的专业终端显示
-- **📈 信息栏**: WebSocket状态、最后活动时间、事件计数
-- **⚙️ 设置面板**: 主题、字体大小、时间戳等个性化配置
-
-### 实时功能
-- **🔄 自动更新**: 终端输出实时流式显示
-- **⚡ 低延迟**: WebSocket通信，响应时间<200ms
-- **📝 完整记录**: 保存所有命令和输出历史
-- **🎨 彩色显示**: 支持ANSI颜色代码，完整终端体验
-
-### 快捷键
-- `Ctrl + ,`: 打开设置面板
-- `Ctrl + L`: 清除历史记录
-
-## 🧠 智能多进程共享系统详解
-
-### 🔄 工作原理
-系统采用完美的多进程协调机制和智能服务器检测：
-
-1. **第一个AI软件连接**: 启动GUI Web服务器(8347)和WebSocket服务器(8573)
-2. **后续AI软件连接**: 检测到服务器已启动，直接共享使用
-3. **工具调用检测**: 检查WebSocket连接状态，断开时重新打开浏览器
-4. **服务器持续运行**: 避免重复启动，直到所有MCP进程退出
-5. **完整资源清理**: 最后一个MCP进程退出时清理所有服务器，释放端口
-
-### 🎯 核心逻辑
-```javascript
-// 多进程共享的服务器启动检测
-async initializeGUI() {
-    // 检测WebSocket服务器是否已启动
-    if (!this.wsBridge.isRunning) {
-        // 只有未启动时，才启动两个服务器
-        this.wsBridge.start();
-        await startGUIServer();
-    }
-    // 如果已启动，直接共享使用
-}
-
-// 简化的浏览器管理
-async manageBrowser() {
-    // 检查连接状态，断开时重新打开
-    const hasConnections = this.wsBridge.hasActiveConnections();
-    if (!hasConnections) {
-        await this.openBrowser();
-    }
-}
-```
-
-### ✨ 优势特点
-- **🚀 多进程协调**: 完美支持多个AI软件同时使用，无冲突
-- **🔧 智能检测**: 基于WebSocket服务器状态检测，避免重复启动
-- **💡 零端口冲突**: 多个MCP进程智能协调，共享同一个GUI服务器
-- **⚡ 完美清理**: 确保VSCode重启后无端口冲突
-- **🎯 用户友好**: 完全自动化，支持任意数量的AI软件连接
-
-## 📚 相关文档
-
-- **GUI架构设计**: `GUI-ARCHITECTURE.md`
-- **GUI使用说明**: `README-GUI.md`
-- **Playwright测试报告**: `PLAYWRIGHT-TEST-REPORT.md`
+### 前端
+- **xterm.js** - 终端模拟器
+- **WebSocket** - 实时通信
+- **原生JavaScript** - 无框架依赖
 
 ## 🎯 使用场景
 
-### 开发调试
-- 观察AI如何操作终端
-- 验证命令执行结果
-- 调试MCP工具调用
+- **AI开发调试** - 观察AI操作终端的过程
+- **自动化脚本** - 通过AI执行复杂的命令序列
+- **系统管理** - AI辅助的系统运维操作
+- **教学演示** - 展示AI与终端的交互过程
 
-### 系统监控
-- 实时监控终端会话
-- 跟踪系统操作历史
-- 分析性能指标
-
-### 教学演示
-- 展示AI操作过程
-- 教学终端使用
-- 演示自动化流程
-
-## 许可证
+## 📄 许可证
 
 MIT License
+
+---
+
+**🚀 开始使用**: `npm install && npm start`
+**🌐 访问GUI**: http://localhost:8347
+**📖 更多信息**: 查看项目文档和源码注释

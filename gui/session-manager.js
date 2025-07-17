@@ -3,6 +3,10 @@
  * 负责创建、切换、关闭会话标签
  */
 
+// 常量定义
+const SESSION_RESIZE_DELAY = 100;
+const SESSION_ID_DISPLAY_LENGTH = 8;
+
 class SessionManager {
     constructor() {
         this.sessions = new Map(); // sessionId -> session data
@@ -15,6 +19,55 @@ class SessionManager {
         this.emptyState = document.getElementById('empty-state');
         
         this.init();
+    }
+
+    /**
+     * 创建DOM元素
+     */
+    _createElement(tag, className, content = '') {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (content) element.textContent = content;
+        return element;
+    }
+
+    /**
+     * 创建会话数据对象
+     */
+    _createSessionData(sessionData) {
+        return {
+            ...sessionData,
+            createdAt: new Date(),
+            isActive: false,
+            output: []
+        };
+    }
+
+    /**
+     * 获取会话标题
+     */
+    _getSessionTitle(sessionData) {
+        const { type, cwd } = sessionData;
+        const dirName = cwd.split('\\').pop() || cwd.split('/').pop() || 'Terminal';
+        return `${type === 'powershell' ? 'PS' : 'CMD'}: ${dirName}`;
+    }
+
+    /**
+     * 延迟执行终端调整
+     */
+    _delayedTerminalResize(sessionId) {
+        setTimeout(() => {
+            window.terminalRenderer?.resizeTerminal(sessionId);
+        }, SESSION_RESIZE_DELAY);
+    }
+
+    /**
+     * 延迟执行终端挂载
+     */
+    _delayedTerminalMount(sessionId, container) {
+        setTimeout(() => {
+            window.terminalRenderer?.mountTerminal(sessionId, container);
+        }, SESSION_RESIZE_DELAY);
     }
 
     /**
@@ -34,12 +87,7 @@ class SessionManager {
         }
 
         // 存储会话数据
-        this.sessions.set(sessionId, {
-            ...sessionData,
-            createdAt: new Date(),
-            isActive: false,
-            output: []
-        });
+        this.sessions.set(sessionId, this._createSessionData(sessionData));
 
         // 创建终端实例
         const terminal = window.terminalRenderer?.createTerminal(sessionId, sessionData);
@@ -67,20 +115,15 @@ class SessionManager {
      * 创建会话标签
      */
     createTab(sessionId, sessionData) {
-        const tab = document.createElement('div');
-        tab.className = 'tab';
+        const tab = this._createElement('div', 'tab');
         tab.dataset.sessionId = sessionId;
-        
+
         // 标签标题
-        const title = document.createElement('span');
-        title.className = 'tab-title';
-        title.textContent = this.getTabTitle(sessionData);
+        const title = this._createElement('span', 'tab-title', this._getSessionTitle(sessionData));
         title.title = `${sessionData.type.toUpperCase()} - ${sessionData.cwd}`;
-        
+
         // 关闭按钮
-        const closeBtn = document.createElement('span');
-        closeBtn.className = 'tab-close';
-        closeBtn.textContent = '×';
+        const closeBtn = this._createElement('span', 'tab-close', '×');
         closeBtn.title = '关闭会话';
         
         // 事件监听
@@ -107,16 +150,14 @@ class SessionManager {
      * 创建终端面板
      */
     createTerminalPanel(sessionId, sessionData) {
-        const panel = document.createElement('div');
-        panel.className = 'terminal-panel';
+        const panel = this._createElement('div', 'terminal-panel');
         panel.dataset.sessionId = sessionId;
-        
+
         // 会话信息栏
-        const sessionInfo = document.createElement('div');
-        sessionInfo.className = 'session-info';
+        const sessionInfo = this._createElement('div', 'session-info');
         sessionInfo.innerHTML = `
             <div>
-                <span class="session-id">${sessionId.substring(0, 8)}...</span>
+                <span class="session-id">${sessionId.substring(0, SESSION_ID_DISPLAY_LENGTH)}...</span>
                 <span class="session-type">${sessionData.type.toUpperCase()}</span>
                 <span class="session-cwd">${sessionData.cwd}</span>
             </div>
@@ -125,21 +166,18 @@ class SessionManager {
                 <span>创建时间: ${new Date().toLocaleTimeString()}</span>
             </div>
         `;
-        
+
         // 终端输出区域
-        const terminalOutput = document.createElement('div');
-        terminalOutput.className = 'terminal-output';
+        const terminalOutput = this._createElement('div', 'terminal-output');
         terminalOutput.id = `terminal-${sessionId}`;
-        
+
         panel.appendChild(sessionInfo);
         panel.appendChild(terminalOutput);
-        
+
         this.terminalContent.appendChild(panel);
-        
+
         // 挂载终端到DOM
-        setTimeout(() => {
-            window.terminalRenderer?.mountTerminal(sessionId, terminalOutput);
-        }, 100);
+        this._delayedTerminalMount(sessionId, terminalOutput);
     }
 
     /**
@@ -177,9 +215,7 @@ class SessionManager {
         sessionData.lastActivated = new Date();
         
         // 调整终端尺寸
-        setTimeout(() => {
-            window.terminalRenderer?.resizeTerminal(sessionId);
-        }, 100);
+        this._delayedTerminalResize(sessionId);
         
         console.log(`会话 ${sessionId} 已激活`);
     }
@@ -289,14 +325,7 @@ class SessionManager {
         return this.terminalContent.querySelector(`[data-session-id="${sessionId}"]`);
     }
 
-    /**
-     * 生成标签标题
-     */
-    getTabTitle(sessionData) {
-        const { type, cwd } = sessionData;
-        const dirName = cwd.split('\\').pop() || cwd.split('/').pop() || 'Terminal';
-        return `${type === 'powershell' ? 'PS' : 'CMD'}: ${dirName}`;
-    }
+
 
     /**
      * 设置会话加载状态

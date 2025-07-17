@@ -3,13 +3,129 @@
  * 负责创建、管理和渲染终端实例
  */
 
+// 常量定义
+const DEFAULT_FONT_SIZE = 14;
+const DEFAULT_LINE_HEIGHT = 1.2;
+const DEFAULT_SCROLLBACK = 1000;
+const DEFAULT_TAB_STOP_WIDTH = 4;
+const XTERM_CHECK_INTERVAL = 100;
+const TERMINAL_RESIZE_DELAY = 100;
+const FONT_FAMILY = 'Consolas, Monaco, "Courier New", monospace';
+
+// 终端主题配置
+const TERMINAL_THEMES = {
+    dark: {
+        background: '#1e1e1e',
+        foreground: '#cccccc',
+        cursor: '#d4d4d4',
+        selection: '#264f78',
+        black: '#000000',
+        red: '#cd3131',
+        green: '#0dbc79',
+        yellow: '#e5e510',
+        blue: '#2472c8',
+        magenta: '#bc3fbc',
+        cyan: '#11a8cd',
+        white: '#e5e5e5',
+        brightBlack: '#666666',
+        brightRed: '#f14c4c',
+        brightGreen: '#23d18b',
+        brightYellow: '#f5f543',
+        brightBlue: '#3b8eea',
+        brightMagenta: '#d670d6',
+        brightCyan: '#29b8db',
+        brightWhite: '#e5e5e5'
+    },
+    light: {
+        background: '#ffffff',
+        foreground: '#333333',
+        cursor: '#333333',
+        selection: '#add6ff',
+        black: '#000000',
+        red: '#cd3131',
+        green: '#00bc00',
+        yellow: '#949800',
+        blue: '#0451a5',
+        magenta: '#bc05bc',
+        cyan: '#0598bc',
+        white: '#555555',
+        brightBlack: '#666666',
+        brightRed: '#cd3131',
+        brightGreen: '#14ce14',
+        brightYellow: '#b5ba00',
+        brightBlue: '#0451a5',
+        brightMagenta: '#bc05bc',
+        brightCyan: '#0598bc',
+        brightWhite: '#a5a5a5'
+    }
+};
+
 class TerminalRenderer {
     constructor() {
         this.terminals = new Map(); // sessionId -> terminal instance
         this.fitAddons = new Map(); // sessionId -> fit addon
+        this.pendingOutputs = new Map(); // sessionId -> array of pending outputs
         this.isXtermLoaded = false;
-        
+
         this.init();
+    }
+
+    /**
+     * 获取终端配置
+     */
+    _getTerminalConfig() {
+        return {
+            cursorBlink: true,
+            cursorStyle: 'block',
+            fontFamily: FONT_FAMILY,
+            fontSize: window.mcpGUI?.settings?.fontSize || DEFAULT_FONT_SIZE,
+            lineHeight: DEFAULT_LINE_HEIGHT,
+            theme: this._getTerminalTheme(),
+            allowTransparency: true,
+            convertEol: true,
+            scrollback: DEFAULT_SCROLLBACK,
+            tabStopWidth: DEFAULT_TAB_STOP_WIDTH
+        };
+    }
+
+    /**
+     * 获取终端主题配置
+     */
+    _getTerminalTheme() {
+        const isDark = window.mcpGUI?.settings?.theme === 'dark';
+        return TERMINAL_THEMES[isDark ? 'dark' : 'light'];
+    }
+
+    /**
+     * 创建并加载终端插件
+     */
+    _createAndLoadAddons(terminal) {
+        const fitAddon = new FitAddon.FitAddon();
+        const webLinksAddon = new WebLinksAddon.WebLinksAddon();
+
+        terminal.loadAddon(fitAddon);
+        terminal.loadAddon(webLinksAddon);
+
+        return { fitAddon, webLinksAddon };
+    }
+
+    /**
+     * 写入带时间戳的内容
+     */
+    _writeWithTimestamp(terminal, content) {
+        const timestamp = window.mcpGUI?.settings?.showTimestamps ?
+            `\x1b[90m[${new Date().toLocaleTimeString()}]\x1b[0m ` : '';
+
+        terminal.writeln(timestamp + this._processLine(content));
+    }
+
+    /**
+     * 延迟调整终端尺寸
+     */
+    _delayedFit(fitAddon) {
+        setTimeout(() => {
+            fitAddon.fit();
+        }, TERMINAL_RESIZE_DELAY);
     }
 
     /**
@@ -29,7 +145,7 @@ class TerminalRenderer {
             console.log('xterm.js已加载');
         } else {
             console.error('xterm.js未加载');
-            setTimeout(() => this.checkXtermAvailability(), 100);
+            setTimeout(() => this.checkXtermAvailability(), XTERM_CHECK_INTERVAL);
         }
     }
 
@@ -49,25 +165,10 @@ class TerminalRenderer {
 
         try {
             // 创建终端实例
-            const terminal = new Terminal({
-                cursorBlink: true,
-                cursorStyle: 'block',
-                fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-                fontSize: window.mcpGUI?.settings?.fontSize || 14,
-                lineHeight: 1.2,
-                theme: this.getTerminalTheme(),
-                allowTransparency: true,
-                convertEol: true,
-                scrollback: 1000,
-                tabStopWidth: 4
-            });
+            const terminal = new Terminal(this._getTerminalConfig());
 
             // 创建并加载插件
-            const fitAddon = new FitAddon.FitAddon();
-            const webLinksAddon = new WebLinksAddon.WebLinksAddon();
-            
-            terminal.loadAddon(fitAddon);
-            terminal.loadAddon(webLinksAddon);
+            const { fitAddon } = this._createAndLoadAddons(terminal);
 
             // 存储引用
             this.terminals.set(sessionId, terminal);
@@ -75,6 +176,9 @@ class TerminalRenderer {
 
             // 写入欢迎信息
             this.writeWelcomeMessage(terminal, sessionData);
+
+            // 处理缓存的输出
+            this._processPendingOutputs(sessionId);
 
             console.log(`终端 ${sessionId} 已创建`);
             return terminal;
@@ -105,9 +209,7 @@ class TerminalRenderer {
             terminal.open(container);
             
             // 调整尺寸
-            setTimeout(() => {
-                fitAddon.fit();
-            }, 100);
+            this._delayedFit(fitAddon);
 
             // 监听窗口大小变化
             const resizeObserver = new ResizeObserver(() => {
@@ -129,9 +231,14 @@ class TerminalRenderer {
      */
     writeOutput(sessionId, output) {
         const terminal = this.terminals.get(sessionId);
-        
+
         if (!terminal) {
-            console.warn(`终端 ${sessionId} 不存在，无法写入输出`);
+            // 终端还未创建，缓存输出
+            if (!this.pendingOutputs.has(sessionId)) {
+                this.pendingOutputs.set(sessionId, []);
+            }
+            this.pendingOutputs.get(sessionId).push(output);
+            console.log(`终端 ${sessionId} 尚未创建，输出已缓存`);
             return;
         }
 
@@ -139,18 +246,11 @@ class TerminalRenderer {
             if (Array.isArray(output)) {
                 output.forEach(line => {
                     if (line.trim()) {
-                        // 添加时间戳（如果启用）
-                        const timestamp = window.mcpGUI?.settings?.showTimestamps ? 
-                            `\x1b[90m[${new Date().toLocaleTimeString()}]\x1b[0m ` : '';
-                        
-                        terminal.writeln(timestamp + this.processLine(line));
+                        this._writeWithTimestamp(terminal, line);
                     }
                 });
             } else if (typeof output === 'string') {
-                const timestamp = window.mcpGUI?.settings?.showTimestamps ? 
-                    `\x1b[90m[${new Date().toLocaleTimeString()}]\x1b[0m ` : '';
-                
-                terminal.writeln(timestamp + this.processLine(output));
+                this._writeWithTimestamp(terminal, output);
             }
 
             // 自动滚动到底部
@@ -267,7 +367,7 @@ class TerminalRenderer {
         
         if (terminal) {
             try {
-                terminal.options.theme = this.getTerminalTheme();
+                terminal.options.theme = this._getTerminalTheme();
             } catch (error) {
                 console.error(`更新终端 ${sessionId} 主题失败:`, error);
             }
@@ -278,7 +378,7 @@ class TerminalRenderer {
      * 更新所有终端的主题
      */
     updateAllThemes() {
-        this.terminals.forEach((terminal, sessionId) => {
+        this.terminals.forEach((_, sessionId) => {
             this.updateTheme(sessionId);
         });
     }
@@ -293,7 +393,7 @@ class TerminalRenderer {
         if (terminal && fitAddon) {
             try {
                 terminal.options.fontSize = fontSize;
-                setTimeout(() => fitAddon.fit(), 100);
+                this._delayedFit(fitAddon);
             } catch (error) {
                 console.error(`更新终端 ${sessionId} 字体大小失败:`, error);
             }
@@ -304,48 +404,20 @@ class TerminalRenderer {
      * 更新所有终端的字体大小
      */
     updateAllFontSizes(fontSize) {
-        this.terminals.forEach((terminal, sessionId) => {
+        this.terminals.forEach((_, sessionId) => {
             this.updateFontSize(sessionId, fontSize);
         });
     }
 
-    /**
-     * 获取终端主题配置
-     */
-    getTerminalTheme() {
-        const isDark = window.mcpGUI?.settings?.theme === 'dark';
-        
-        return {
-            background: isDark ? '#1e1e1e' : '#ffffff',
-            foreground: isDark ? '#cccccc' : '#333333',
-            cursor: isDark ? '#d4d4d4' : '#333333',
-            selection: isDark ? '#264f78' : '#add6ff',
-            black: isDark ? '#000000' : '#000000',
-            red: isDark ? '#cd3131' : '#cd3131',
-            green: isDark ? '#0dbc79' : '#00bc00',
-            yellow: isDark ? '#e5e510' : '#949800',
-            blue: isDark ? '#2472c8' : '#0451a5',
-            magenta: isDark ? '#bc3fbc' : '#bc05bc',
-            cyan: isDark ? '#11a8cd' : '#0598bc',
-            white: isDark ? '#e5e5e5' : '#555555',
-            brightBlack: isDark ? '#666666' : '#666666',
-            brightRed: isDark ? '#f14c4c' : '#cd3131',
-            brightGreen: isDark ? '#23d18b' : '#14ce14',
-            brightYellow: isDark ? '#f5f543' : '#b5ba00',
-            brightBlue: isDark ? '#3b8eea' : '#0451a5',
-            brightMagenta: isDark ? '#d670d6' : '#bc05bc',
-            brightCyan: isDark ? '#29b8db' : '#0598bc',
-            brightWhite: isDark ? '#e5e5e5' : '#a5a5a5'
-        };
-    }
+
 
     /**
      * 处理输出行，添加颜色和格式
      */
-    processLine(line) {
+    _processLine(line) {
         // 移除ANSI转义序列（如果需要）
         // line = line.replace(/\x1b\[[0-9;]*m/g, '');
-        
+
         // 这里可以添加更多的处理逻辑，比如高亮关键词等
         return line;
     }
@@ -384,16 +456,31 @@ class TerminalRenderer {
     }
 
     /**
+     * 处理缓存的输出
+     */
+    _processPendingOutputs(sessionId) {
+        const pendingOutputs = this.pendingOutputs.get(sessionId);
+        if (pendingOutputs && pendingOutputs.length > 0) {
+            console.log(`处理终端 ${sessionId} 的 ${pendingOutputs.length} 个缓存输出`);
+            pendingOutputs.forEach(output => {
+                this.writeOutput(sessionId, output);
+            });
+            this.pendingOutputs.delete(sessionId);
+        }
+    }
+
+    /**
      * 清理所有资源
      */
     cleanup() {
-        this.terminals.forEach((terminal, sessionId) => {
+        this.terminals.forEach((_, sessionId) => {
             this.destroyTerminal(sessionId);
         });
-        
+
         this.terminals.clear();
         this.fitAddons.clear();
-        
+        this.pendingOutputs.clear();
+
         console.log('终端渲染器已清理');
     }
 }
