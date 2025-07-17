@@ -1,15 +1,43 @@
 /**
- * 终端渲染器 - 使用xterm.js处理终端显示
- * 负责创建、管理和渲染终端实例
+ * 终端渲染器模块
+ *
+ * 该模块使用xterm.js库处理终端的显示和渲染，提供高性能的
+ * 终端模拟器功能，包括文本渲染、主题管理、尺寸调整等。
+ *
+ * 主要功能：
+ * - 终端实例创建和管理
+ * - 文本渲染和显示
+ * - 主题和样式管理
+ * - 终端尺寸自适应
+ * - 用户交互处理
+ *
+ * @author MCP Terminal Server Team
+ * @version 1.1.0
  */
 
-// 常量定义
+// ============================================================================
+// 配置常量
+// ============================================================================
+
+/** 默认字体大小 */
 const DEFAULT_FONT_SIZE = 14;
+
+/** 默认行高 */
 const DEFAULT_LINE_HEIGHT = 1.2;
+
+/** 默认滚动缓冲区大小 */
 const DEFAULT_SCROLLBACK = 1000;
+
+/** 默认制表符宽度 */
 const DEFAULT_TAB_STOP_WIDTH = 4;
+
+/** xterm.js检查间隔（毫秒） */
 const XTERM_CHECK_INTERVAL = 100;
+
+/** 终端调整大小延迟（毫秒） */
 const TERMINAL_RESIZE_DELAY = 100;
+
+/** 终端字体族 */
 const FONT_FAMILY = 'Consolas, Monaco, "Courier New", monospace';
 
 // 终端主题配置
@@ -38,8 +66,8 @@ const TERMINAL_THEMES = {
     },
     light: {
         background: '#ffffff',
-        foreground: '#333333',
-        cursor: '#333333',
+        foreground: '#d4d4d4',
+        cursor: '#d4d4d4',
         selection: '#add6ff',
         black: '#000000',
         red: '#cd3131',

@@ -1,14 +1,39 @@
 /**
- * MCP Terminal GUI - 重构后的主应用逻辑
- * 职责分离：WebSocket客户端、UI状态管理、设置管理
+ * MCP Terminal GUI - 主应用程序
+ *
+ * 该文件是MCP终端管理器的前端主应用程序，负责协调各个组件
+ * 之间的交互，包括WebSocket通信、UI状态管理、设置管理等。
+ *
+ * 架构设计：
+ * - WebSocket客户端：负责与后端通信
+ * - UI状态管理器：管理界面状态和用户交互
+ * - 设置管理器：处理用户偏好设置
+ * - 会话管理器：管理终端会话
+ * - 终端渲染器：处理终端输出显示
+ *
+ * @author MCP Terminal Server Team
+ * @version 1.1.0
  */
 
-// 导入配置（模拟，实际应该从配置文件导入）
+// ============================================================================
+// 配置常量
+// ============================================================================
+
+/**
+ * GUI应用配置
+ * @readonly
+ * @type {Object}
+ */
 const GUI_CONFIG = {
+    /** WebSocket服务器URL */
     WEBSOCKET_URL: 'ws://localhost:8573',
+    /** 最大重连尝试次数 */
     MAX_RECONNECT_ATTEMPTS: 5,
+    /** 重连延迟时间（毫秒） */
     RECONNECT_DELAY: 2000,
+    /** 时间更新间隔（毫秒） */
     TIME_UPDATE_INTERVAL: 1000,
+    /** 默认用户设置 */
     DEFAULT_SETTINGS: {
         theme: 'dark',
         fontSize: 14,
@@ -17,10 +42,22 @@ const GUI_CONFIG = {
     }
 };
 
+// ============================================================================
+// WebSocket客户端管理器
+// ============================================================================
+
 /**
- * WebSocket客户端管理器 - 专门负责WebSocket连接
+ * WebSocket客户端管理器
+ *
+ * 专门负责WebSocket连接的建立、维护、重连和消息处理。
+ * 提供可靠的通信机制，包括自动重连和错误处理。
  */
 class WebSocketClient {
+    /**
+     * 构造函数
+     * @param {Object} config - 配置对象
+     * @param {Object} messageHandler - 消息处理器对象
+     */
     constructor(config, messageHandler) {
         this.config = config;
         this.messageHandler = messageHandler;
@@ -30,40 +67,15 @@ class WebSocketClient {
     }
 
     /**
-     * 初始化WebSocket连接
+     * 建立WebSocket连接
+     *
+     * 创建WebSocket实例并设置事件处理器，包括连接建立、
+     * 消息接收、连接关闭和错误处理。
      */
     connect() {
         try {
             this.ws = new WebSocket(this.config.WEBSOCKET_URL);
-
-            this.ws.onopen = () => {
-                console.log('WebSocket连接已建立');
-                this.isConnected = true;
-                this.reconnectAttempts = 0;
-                this.messageHandler.onConnectionChange('已连接', true);
-            };
-
-            this.ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    this.messageHandler.onMessage(data);
-                } catch (error) {
-                    console.error('解析WebSocket消息失败:', error);
-                }
-            };
-
-            this.ws.onclose = () => {
-                console.log('WebSocket连接已关闭');
-                this.isConnected = false;
-                this.messageHandler.onConnectionChange('连接断开', false);
-                this.attemptReconnect();
-            };
-
-            this.ws.onerror = (error) => {
-                console.error('WebSocket错误:', error);
-                this.messageHandler.onConnectionChange('连接错误', false);
-            };
-
+            this._setupEventHandlers();
         } catch (error) {
             console.error('创建WebSocket连接失败:', error);
             this.messageHandler.onConnectionChange('连接失败', false);
@@ -71,18 +83,111 @@ class WebSocketClient {
     }
 
     /**
+     * 设置WebSocket事件处理器
+     * @private
+     */
+    _setupEventHandlers() {
+        this.ws.onopen = () => this._handleOpen();
+        this.ws.onmessage = (event) => this._handleMessage(event);
+        this.ws.onclose = () => this._handleClose();
+        this.ws.onerror = (error) => this._handleError(error);
+    }
+
+    /**
+     * 处理连接建立事件
+     * @private
+     */
+    _handleOpen() {
+        console.log('WebSocket连接已建立');
+        this.isConnected = true;
+        this.reconnectAttempts = 0;
+        this.messageHandler.onConnectionChange('已连接', true);
+    }
+
+    /**
+     * 处理消息接收事件
+     * @param {MessageEvent} event - 消息事件
+     * @private
+     */
+    _handleMessage(event) {
+        try {
+            const data = JSON.parse(event.data);
+            this.messageHandler.onMessage(data);
+        } catch (error) {
+            console.error('解析WebSocket消息失败:', error);
+        }
+    }
+
+    /**
+     * 处理连接关闭事件
+     * @private
+     */
+    _handleClose() {
+        console.log('WebSocket连接已关闭');
+        this.isConnected = false;
+        this.messageHandler.onConnectionChange('连接断开', false);
+        this.attemptReconnect();
+    }
+
+    /**
+     * 处理连接错误事件
+     * @param {Event} error - 错误事件
+     * @private
+     */
+    _handleError(error) {
+        console.error('WebSocket错误:', error);
+        this.messageHandler.onConnectionChange('连接错误', false);
+    }
+
+    /**
      * 尝试重新连接
+     *
+     * 实现指数退避重连策略，在达到最大重连次数前持续尝试重连。
+     * 每次重连都会更新UI状态以通知用户当前的重连进度。
      */
     attemptReconnect() {
-        if (this.reconnectAttempts >= this.config.MAX_RECONNECT_ATTEMPTS) {
-            console.log('达到最大重连次数，停止重连');
-            this.messageHandler.onConnectionChange('连接失败', false);
+        if (this._shouldStopReconnecting()) {
+            this._handleReconnectFailure();
             return;
         }
 
-        this.reconnectAttempts++;
-        this.messageHandler.onConnectionChange(`重连中 (${this.reconnectAttempts}/${this.config.MAX_RECONNECT_ATTEMPTS})`, false);
+        this._incrementReconnectAttempts();
+        this._scheduleReconnect();
+    }
 
+    /**
+     * 检查是否应该停止重连
+     * @returns {boolean} 是否应该停止重连
+     * @private
+     */
+    _shouldStopReconnecting() {
+        return this.reconnectAttempts >= this.config.MAX_RECONNECT_ATTEMPTS;
+    }
+
+    /**
+     * 处理重连失败
+     * @private
+     */
+    _handleReconnectFailure() {
+        console.log('达到最大重连次数，停止重连');
+        this.messageHandler.onConnectionChange('连接失败', false);
+    }
+
+    /**
+     * 增加重连尝试次数并更新状态
+     * @private
+     */
+    _incrementReconnectAttempts() {
+        this.reconnectAttempts++;
+        const statusMessage = `重连中 (${this.reconnectAttempts}/${this.config.MAX_RECONNECT_ATTEMPTS})`;
+        this.messageHandler.onConnectionChange(statusMessage, false);
+    }
+
+    /**
+     * 安排下次重连
+     * @private
+     */
+    _scheduleReconnect() {
         setTimeout(() => {
             console.log(`尝试重连 (${this.reconnectAttempts}/${this.config.MAX_RECONNECT_ATTEMPTS})`);
             this.connect();
@@ -90,22 +195,38 @@ class WebSocketClient {
     }
 
     /**
-     * 发送消息
+     * 发送消息到WebSocket服务器
+     * @param {Object} message - 要发送的消息对象
+     * @returns {boolean} 是否成功发送
      */
     send(message) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        if (this._isConnectionReady()) {
             this.ws.send(JSON.stringify(message));
             return true;
         }
+        console.warn('WebSocket连接未就绪，无法发送消息');
         return false;
     }
 
     /**
-     * 关闭连接
+     * 检查连接是否就绪
+     * @returns {boolean} 连接是否就绪
+     * @private
+     */
+    _isConnectionReady() {
+        return this.ws && this.ws.readyState === WebSocket.OPEN;
+    }
+
+    /**
+     * 关闭WebSocket连接
+     *
+     * 优雅地关闭WebSocket连接，清理资源并重置状态。
      */
     close() {
         if (this.ws) {
             this.ws.close();
+            this.ws = null;
+            this.isConnected = false;
         }
     }
 }
@@ -437,7 +558,7 @@ class MCPTerminalGUI {
      * 处理WebSocket消息
      */
     handleWebSocketMessage(data) {
-        const { type, timestamp, sessionId, data: eventData } = data;
+        const { type, sessionId, data: eventData } = data;
 
         // 添加到事件历史
         this.uiStateManager.addEventToHistory(data);
@@ -517,12 +638,12 @@ class MCPTerminalGUI {
         this.uiStateManager.updateSessionCount();
     }
 
-    handleToolCall(sessionId, data) {
+    handleToolCall(_sessionId, data) {
         console.log('工具调用:', data);
         this.uiStateManager.showNotification(`AI调用工具: ${data.tool}`, 'info');
     }
 
-    handleError(sessionId, data) {
+    handleError(_sessionId, data) {
         console.error('收到错误事件:', data);
         this.uiStateManager.showNotification(`错误: ${data.error}`, 'error');
     }

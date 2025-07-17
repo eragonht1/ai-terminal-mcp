@@ -1,24 +1,67 @@
 /**
- * 会话管理器 - 管理终端会话的标签和面板
- * 负责创建、切换、关闭会话标签
+ * 会话管理器模块
+ *
+ * 该模块负责管理终端会话的标签页和面板，提供会话的创建、
+ * 切换、关闭等功能，以及会话状态的可视化管理。
+ *
+ * 主要功能：
+ * - 会话标签页管理
+ * - 会话面板切换
+ * - 会话状态跟踪
+ * - 用户界面更新
+ *
+ * @author MCP Terminal Server Team
+ * @version 1.1.0
  */
 
-// 常量定义
+// ============================================================================
+// 配置常量
+// ============================================================================
+
+/** 会话调整大小延迟时间（毫秒） */
 const SESSION_RESIZE_DELAY = 100;
+
+/** 会话ID显示长度 */
 const SESSION_ID_DISPLAY_LENGTH = 8;
 
+// ============================================================================
+// 会话管理器类
+// ============================================================================
+
+/**
+ * 会话管理器
+ *
+ * 负责管理所有终端会话的生命周期，包括标签页的创建、切换、
+ * 关闭等操作，以及会话状态的可视化展示。
+ */
 class SessionManager {
+    /**
+     * 构造函数
+     *
+     * 初始化会话管理器，设置数据结构和DOM元素引用，
+     * 并调用初始化方法完成设置。
+     */
     constructor() {
+        // 数据结构
         this.sessions = new Map(); // sessionId -> session data
         this.activeSessions = new Set(); // 活跃的会话ID
         this.currentSessionId = null;
-        
-        // DOM元素
+
+        // DOM元素引用
+        this._initializeDOMReferences();
+
+        // 初始化组件
+        this.init();
+    }
+
+    /**
+     * 初始化DOM元素引用
+     * @private
+     */
+    _initializeDOMReferences() {
         this.tabBar = document.getElementById('tab-bar');
         this.terminalContent = document.getElementById('terminal-content');
         this.emptyState = document.getElementById('empty-state');
-        
-        this.init();
     }
 
     /**
